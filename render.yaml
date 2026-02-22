@@ -6,4 +6,4 @@ services:
     buildCommand: |
       apt-get update && apt-get install -y ffmpeg
       pip install -r requirements.txt
-    startCommand: python app.py
+    startCommand: uvicorn server:app --reload --port 8000
