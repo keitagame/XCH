@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Xch</title>
+<style>
+@font-face {
+  font-family: "Renner";
+  src: url("/static/Renner.ttf") format("truetype");
+  font-display: swap;
+}
+
+:root {
+  --bg: #000;
+  --fg: #fff;
+  --dim: #555;
+  --dim2: #333;
+  --accent: #e8ff00;
+  --red: #ff3c00;
+  --panel: #0c0c0c;
+  --border: #1c1c1c;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Renner", "Arial Narrow", sans-serif;
+  min-height: 100vh;
+}
+
+/* ── NOISE GRAIN ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.4;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 200;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  background: rgba(0,0,0,0.88);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+}
+
+.logo {
+  font-size: 22px;
+  letter-spacing: 8px;
+  font-weight: 300;
+  user-select: none;
+}
+.logo em { color: var(--accent); font-style: normal; }
+
+.nav-center {
+  display: flex;
+  gap: 1px;
+}
+
+.tab {
+  background: none;
+  border: none;
+  color: var(--dim);
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: color 0.2s;
+  border-bottom: 1px solid transparent;
+  position: relative;
+}
+.tab:hover { color: #999; }
+.tab.active { color: var(--fg); border-bottom-color: var(--accent); }
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: var(--dim);
+}
+
+.live-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--dim);
+  transition: background 0.4s, box-shadow 0.4s;
+}
+.dot.live { background: var(--red); box-shadow: 0 0 10px var(--red); animation: blink 1.4s infinite; }
+
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+#nav-clock { font-size: 13px; letter-spacing: 3px; }
+
+/* ── PAGES ── */
+.page { display: none; padding-top: 52px; min-height: 100vh; }
+.page.active { display: block; }
+
+/* ═══════════════════════════════════
+   VIEWER PAGE
+═══════════════════════════════════ */
+#page-viewer {
+  display: none;
+  flex-direction: column;
+  height: 100vh;
+  padding-top: 52px;
+}
+#page-viewer.active { display: flex; }
+
+/* Video area */
+.video-container {
+  flex: 1;
+  position: relative;
+  background: #000;
+  overflow: hidden;
+  min-height: 0;
+}
+
+#main-video {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.video-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: #000;
+  transition: opacity 0.5s;
+}
+.video-overlay.hidden { opacity: 0; pointer-events: none; }
+
+.overlay-label {
+  font-size: 11px;
+  letter-spacing: 6px;
+  color: var(--dim);
+  text-transform: uppercase;
+}
+
+.overlay-title {
+  font-size: 32px;
+  letter-spacing: 2px;
+  font-weight: 300;
+  color: #fff;
+  max-width: 60%;
+  text-align: center;
+}
+
+.overlay-sub {
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--dim);
+}
+
+/* HUD overlays on video */
+.hud {
+  position: absolute;
+  pointer-events: none;
+}
+
+.hud-tl {
+  top: 18px; left: 22px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0,0,0,0.55);
+  padding: 6px 12px;
+  border-left: 2px solid var(--red);
+}
+
+.hud-live-text {
+  font-size: 10px;
+  letter-spacing: 4px;
+  color: var(--red);
+}
+
+.hud-clock {
+  font-size: 13px;
+  letter-spacing: 3px;
+}
+
+.hud-tr {
+  top: 18px; right: 22px;
+  background: rgba(0,0,0,0.55);
+  padding: 6px 12px;
+  text-align: right;
+}
+
+#hud-title {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #bbb;
+}
+
+#hud-broadcaster {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--dim);
+  margin-top: 2px;
+}
+
+.hud-bl {
+  bottom: 18px; left: 22px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0,0,0,0.55);
+  padding: 5px 10px;
+}
+
+.hud-remaining-label {
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: var(--dim);
+}
+
+#hud-remaining {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--accent);
+}
+
+/* Progress bar */
+.progress-bar-wrap {
+  height: 2px;
+  background: var(--border);
+  position: relative;
+}
+
+#progress-bar {
+  height: 100%;
+  background: var(--accent);
+  width: 0%;
+  transition: width 1s linear;
+}
+
+/* Next up panel */
+.next-up-panel {
+  height: 80px;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 20px;
+  overflow: hidden;
+}
+
+.next-up-label {
+  font-size: 9px;
+  letter-spacing: 4px;
+  color: var(--dim);
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.next-up-divider {
+  width: 1px;
+  height: 30px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.next-up-title {
+  font-size: 14px;
+  letter-spacing: 2px;
+  color: #bbb;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.next-up-meta {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--dim);
+  margin-top: 3px;
+}
+
+.next-up-empty {
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--dim2);
+}
+
+/* ═══════════════════════════════════
+   BROADCAST PAGE
+═══════════════════════════════════ */
+#page-broadcast {
+  display: none;
+  padding: 52px 0 40px;
+}
+#page-broadcast.active { display: block; }
+
+.bc-wrap {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 40px 32px;
+}
+
+.bc-head {
+  margin-bottom: 40px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 24px;
+}
+
+.bc-head h1 {
+  font-size: 28px;
+  font-weight: 300;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+}
+
+.bc-head p {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--dim);
+  margin-top: 8px;
+}
+
+/* Form */
+.form-section {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 32px;
+  margin-bottom: 32px;
+}
+
+.form-section-title {
+  font-size: 10px;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 24px;
+}
+
+.field {
+  margin-bottom: 20px;
+}
+
+.field label {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 8px;
+}
+
+.field input, .field select {
+  width: 100%;
+  background: #000;
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 14px;
+  letter-spacing: 1px;
+  padding: 10px 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.field input:focus, .field select:focus {
+  border-color: var(--accent);
+}
+
+.field select option { background: #111; }
+
+/* Drop zone */
+.dropzone {
+  border: 1px dashed var(--dim2);
+  padding: 40px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative;
+}
+.dropzone:hover, .dropzone.drag-over {
+  border-color: var(--accent);
+  background: rgba(232,255,0,0.02);
+}
+.dropzone input[type=file] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+.dropzone-icon {
+  font-size: 32px;
+  color: var(--dim2);
+  margin-bottom: 12px;
+}
+.dropzone-text {
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--dim);
+}
+.dropzone-selected {
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: var(--accent);
+  margin-top: 10px;
+}
+
+/* Upload progress */
+.upload-progress-wrap {
+  display: none;
+  margin-top: 16px;
+}
+.upload-progress-wrap.show { display: block; }
+.upload-progress-bar {
+  height: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+.upload-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  width: 0%;
+  transition: width 0.3s;
+}
+.upload-status {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--dim);
+  margin-top: 8px;
+}
+
+/* Buttons */
+.btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  padding: 12px 28px;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.btn:hover { border-color: var(--fg); }
+.btn-accent {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.btn-accent:hover {
+  background: var(--accent);
+  color: #000;
+}
+.btn-danger { border-color: var(--red); color: var(--red); }
+.btn-danger:hover { background: var(--red); color: #fff; }
+.btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* Schedule table */
+.schedule-section {
+  margin-top: 40px;
+}
+
+.schedule-title {
+  font-size: 10px;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.schedule-empty {
+  text-align: center;
+  padding: 48px;
+  color: var(--dim2);
+  font-size: 12px;
+  letter-spacing: 3px;
+  border: 1px solid var(--border);
+}
+
+.schedule-item {
+  display: grid;
+  grid-template-columns: 60px 1fr 160px 100px 60px;
+  align-items: center;
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  border-top: none;
+  gap: 16px;
+  transition: background 0.2s;
+}
+.schedule-item:first-child { border-top: 1px solid var(--border); }
+.schedule-item:hover { background: rgba(255,255,255,0.02); }
+
+.schedule-item.live-row {
+  border-left: 2px solid var(--red);
+  background: rgba(255,60,0,0.03);
+}
+
+.sched-status {
+  font-size: 9px;
+  letter-spacing: 3px;
+  text-align: center;
+  padding: 4px 0;
+}
+.sched-status.live { color: var(--red); }
+.sched-status.queued { color: var(--dim); }
+
+.sched-info {}
+.sched-title { font-size: 13px; letter-spacing: 1px; }
+.sched-broadcaster { font-size: 10px; letter-spacing: 2px; color: var(--dim); margin-top: 3px; }
+
+.sched-time {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--dim);
+  line-height: 1.6;
+}
+
+.sched-dur {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--accent);
+  text-align: center;
+}
+
+.sched-del {
+  text-align: center;
+}
+
+/* Result message */
+.result-msg {
+  padding: 14px 20px;
+  font-size: 11px;
+  letter-spacing: 2px;
+  display: none;
+  margin-top: 16px;
+}
+.result-msg.show { display: block; }
+.result-msg.success { border-left: 2px solid var(--accent); color: var(--accent); background: rgba(232,255,0,0.04); }
+.result-msg.error { border-left: 2px solid var(--red); color: var(--red); background: rgba(255,60,0,0.04); }
+
+.fields-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="logo">X<em>ch</em></div>
+  <div class="nav-center">
+    <button class="tab active" onclick="switchTab('viewer')">WATCH</button>
+    <button class="tab" onclick="switchTab('broadcast')">BROADCAST</button>
+  </div>
+  <div class="nav-right">
+    <div class="live-indicator">
+      <div class="dot" id="nav-dot"></div>
+      <span id="nav-live-text">OFFLINE</span>
+    </div>
+    <span style="color:var(--dim2)">|</span>
+    <span id="nav-clock">00:00:00</span>
+  </div>
+</nav>
+
+<!-- ═══ VIEWER PAGE ═══ -->
+<div class="page" id="page-viewer">
+
+  <div class="video-container">
+    <video id="main-video" autoplay></video>
+
+    <!-- オフライン / 待機オーバーレイ -->
+    <div class="video-overlay" id="video-overlay">
+      <span class="overlay-label">XCH — 001</span>
+      <div class="overlay-title" id="overlay-title">NO BROADCAST</div>
+      <div class="overlay-sub" id="overlay-sub">配信を待っています</div>
+    </div>
+
+    <!-- HUD: 左上 LIVE + 時計 -->
+    <div class="hud hud-tl" id="hud-tl" style="display:none">
+      <div class="dot live" style="pointer-events:none"></div>
+      <span class="hud-live-text">LIVE</span>
+      <span class="hud-clock" id="hud-clock">00:00:00</span>
+    </div>
+
+    <!-- HUD: 右上 タイトル -->
+    <div class="hud hud-tr" id="hud-tr" style="display:none">
+      <div id="hud-title">—</div>
+      <div id="hud-broadcaster">—</div>
+    </div>
+
+    <!-- HUD: 左下 残り時間 -->
+    <div class="hud hud-bl" id="hud-bl" style="display:none">
+      <span class="hud-remaining-label">REMAINING</span>
+      <span id="hud-remaining">—</span>
+    </div>
+  </div>
+
+  <!-- プログレスバー -->
+  <div class="progress-bar-wrap">
+    <div id="progress-bar"></div>
+  </div>
+
+  <!-- ネクスト -->
+  <div class="next-up-panel">
+    <span class="next-up-label">Next</span>
+    <div class="next-up-divider"></div>
+    <div id="next-up-content">
+      <div class="next-up-empty" style="letter-spacing:3px;font-size:11px;color:var(--dim2)">— キューは空です —</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ BROADCAST PAGE ═══ -->
+<div class="page" id="page-broadcast">
+<div class="bc-wrap">
+
+  <div class="bc-head">
+    <h1>Broadcast</h1>
+    <p>動画をアップロードして配信をスケジュールする</p>
+  </div>
+
+  <!-- アップロードフォーム -->
+  <div class="form-section">
+    <div class="form-section-title">新規配信予約</div>
+
+    <div class="fields-row">
+      <div class="field">
+        <label>タイトル</label>
+        <input type="text" id="f-title" placeholder="配信タイトル">
+      </div>
+      <div class="field">
+        <label>配信者名</label>
+        <input type="text" id="f-broadcaster" placeholder="あなたの名前">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>配信時間</label>
+      <select id="f-duration">
+        <option value="0.083">5分（テスト用）</option>
+        <option value="0.25">15分</option>
+        <option value="0.5">30分</option>
+        <option value="1" selected>1時間</option>
+        <option value="2">2時間</option>
+        <option value="3">3時間</option>
+        <option value="4">4時間</option>
+        <option value="6">6時間</option>
+        <option value="8">8時間</option>
+        <option value="12">12時間</option>
+        <option value="24">24時間</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>動画ファイル</label>
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="f-file" accept="video/mp4,video/webm,video/quicktime,video/x-matroska">
+        <div class="dropzone-icon">▲</div>
+        <div class="dropzone-text">クリックまたはドラッグ&ドロップ</div>
+        <div class="dropzone-text" style="margin-top:4px;font-size:9px;color:var(--dim2)">MP4 / WEBM / MOV / MKV</div>
+        <div class="dropzone-selected" id="dropzone-selected"></div>
+      </div>
+      <div class="upload-progress-wrap" id="upload-progress-wrap">
+        <div class="upload-progress-bar"><div class="upload-progress-fill" id="upload-progress-fill"></div></div>
+        <div class="upload-status" id="upload-status">アップロード中...</div>
+      </div>
+    </div>
+
+    <button class="btn btn-accent" id="upload-btn" onclick="doUpload()">予約する</button>
+    <div class="result-msg" id="result-msg"></div>
+  </div>
+
+  <!-- スケジュール -->
+  <div class="schedule-section">
+    <div class="schedule-title">配信スケジュール</div>
+    <div id="schedule-list">
+      <div class="schedule-empty">スケジュールなし</div>
+    </div>
+    <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
+      <button class="btn btn-danger" onclick="doSkip()" id="skip-btn" style="display:none">現在の配信をスキップ</button>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  document.getElementById('page-' + tab).classList.add('active');
+  if (tab === 'broadcast') renderSchedule();
+}
+
+// ── Clock ─────────────────────────────────────────────────────────────────────
+function tickClock() {
+  const now = new Date();
+  const t = [now.getHours(), now.getMinutes(), now.getSeconds()]
+    .map(n => String(n).padStart(2, '0')).join(':');
+  document.getElementById('nav-clock').textContent = t;
+  document.getElementById('hud-clock').textContent = t;
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+// ── API ───────────────────────────────────────────────────────────────────────
+const API = '';  // same origin
+
+let currentStatus = null;
+let currentVideoId = null;
+
+async function fetchStatus() {
+  try {
+    const r = await fetch(`${API}/api/status`);
+    const data = await r.json();
+    applyStatus(data);
+  } catch(e) {
+    console.error('status fetch failed', e);
+  }
+}
+
+function fmtTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'});
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${mm}/${dd} ${d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}`;
+}
+
+function fmtRemaining(seconds) {
+  if (seconds == null || seconds < 0) return '—';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) return `${h}h ${String(m).padStart(2,'0')}m`;
+  if (m > 0) return `${m}m ${String(s).padStart(2,'0')}s`;
+  return `${String(s).padStart(2,'0')}s`;
+}
+
+function applyStatus(data) {
+  currentStatus = data;
+  const dot = document.getElementById('nav-dot');
+  const navText = document.getElementById('nav-live-text');
+
+  if (data.is_live && data.current) {
+    const cur = data.current;
+
+    // Nav
+    dot.classList.add('live');
+    navText.textContent = 'LIVE';
+
+    // Overlay
+    document.getElementById('video-overlay').classList.add('hidden');
+
+    // HUD
+    document.getElementById('hud-tl').style.display = 'flex';
+    document.getElementById('hud-tr').style.display = 'block';
+    document.getElementById('hud-bl').style.display = 'flex';
+    document.getElementById('hud-title').textContent = cur.title;
+    document.getElementById('hud-broadcaster').textContent = cur.broadcaster;
+
+    // Remaining
+    const rem = cur.remaining_seconds;
+    document.getElementById('hud-remaining').textContent = fmtRemaining(rem);
+
+    // Progress
+    const totalSec = cur.duration_hours * 3600;
+    const elapsed = totalSec - rem;
+    const pct = Math.min(100, (elapsed / totalSec) * 100);
+    document.getElementById('progress-bar').style.width = pct + '%';
+
+    // Load video if changed
+    if (cur.id !== currentVideoId) {
+      currentVideoId = cur.id;
+      const video = document.getElementById('main-video');
+      video.src = `/api/stream/${cur.id}`;
+      video.play().catch(() => {});
+    }
+
+    // Next up
+    const nextItems = data.queue.filter(i => i.id !== cur.id && i.status === 'queued');
+    const nextEl = document.getElementById('next-up-content');
+    if (nextItems.length > 0) {
+      const n = nextItems[0];
+      nextEl.innerHTML = `
+        <div class="next-up-title">${escHtml(n.title)}</div>
+        <div class="next-up-meta">${escHtml(n.broadcaster)} — ${fmtDate(n.scheduled_start)} (${n.duration_hours}h)</div>
+      `;
+    } else {
+      nextEl.innerHTML = `<div class="next-up-empty">次の配信はありません</div>`;
+    }
+
+  } else {
+    // Offline
+    dot.classList.remove('live');
+    navText.textContent = 'OFFLINE';
+    document.getElementById('video-overlay').classList.remove('hidden');
+
+    // Check if something is queued
+    const q = (data.queue || []).filter(i => i.status === 'queued');
+    if (q.length > 0) {
+      const n = q[0];
+      document.getElementById('overlay-title').textContent = n.title;
+      document.getElementById('overlay-sub').textContent =
+        `${escHtml(n.broadcaster)} — 配信開始: ${fmtDate(n.scheduled_start)}`;
+    } else {
+      document.getElementById('overlay-title').textContent = 'NO BROADCAST';
+      document.getElementById('overlay-sub').textContent = '配信を待っています';
+    }
+
+    document.getElementById('hud-tl').style.display = 'none';
+    document.getElementById('hud-tr').style.display = 'none';
+    document.getElementById('hud-bl').style.display = 'none';
+    document.getElementById('progress-bar').style.width = '0%';
+    currentVideoId = null;
+    const video = document.getElementById('main-video');
+    video.src = '';
+    document.getElementById('next-up-content').innerHTML =
+      `<div class="next-up-empty">— キューは空です —</div>`;
+  }
+}
+
+// ── Schedule render ───────────────────────────────────────────────────────────
+async function renderSchedule() {
+  try {
+    const r = await fetch(`${API}/api/status`);
+    const data = await r.json();
+    const list = document.getElementById('schedule-list');
+    const queue = data.queue || [];
+
+    const skipBtn = document.getElementById('skip-btn');
+    skipBtn.style.display = data.is_live ? 'block' : 'none';
+
+    if (queue.length === 0) {
+      list.innerHTML = '<div class="schedule-empty">スケジュールなし</div>';
+      return;
+    }
+
+    list.innerHTML = queue.map(item => {
+      const isLive = item.status === 'live';
+      return `
+        <div class="schedule-item ${isLive ? 'live-row' : ''}">
+          <div class="sched-status ${item.status}">${isLive ? '● LIVE' : 'QUEUED'}</div>
+          <div class="sched-info">
+            <div class="sched-title">${escHtml(item.title)}</div>
+            <div class="sched-broadcaster">${escHtml(item.broadcaster)}</div>
+          </div>
+          <div class="sched-time">
+            ${fmtDate(item.scheduled_start)}<br>
+            → ${fmtDate(item.scheduled_end)}
+          </div>
+          <div class="sched-dur">${item.duration_hours}h</div>
+          <div class="sched-del">
+            ${!isLive ? `<button class="btn btn-danger" style="padding:6px 10px;font-size:9px" onclick="doDelete('${item.id}')">✕</button>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+// ── Upload ────────────────────────────────────────────────────────────────────
+document.getElementById('f-file').addEventListener('change', function() {
+  const f = this.files[0];
+  document.getElementById('dropzone-selected').textContent = f ? f.name : '';
+});
+
+const dz = document.getElementById('dropzone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault();
+  dz.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) {
+    document.getElementById('f-file').files = e.dataTransfer.files;
+    document.getElementById('dropzone-selected').textContent = f.name;
+  }
+});
+
+async function doUpload() {
+  const title = document.getElementById('f-title').value.trim();
+  const broadcaster = document.getElementById('f-broadcaster').value.trim();
+  const duration = document.getElementById('f-duration').value;
+  const file = document.getElementById('f-file').files[0];
+
+  if (!title || !broadcaster || !file) {
+    showResult('タイトル・配信者名・動画ファイルを入力してください', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('upload-btn');
+  btn.disabled = true;
+
+  const pw = document.getElementById('upload-progress-wrap');
+  const pf = document.getElementById('upload-progress-fill');
+  const ps = document.getElementById('upload-status');
+  pw.classList.add('show');
+  pf.style.width = '0%';
+  ps.textContent = 'アップロード中...';
+
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('title', title);
+  fd.append('broadcaster', broadcaster);
+  fd.append('duration_hours', duration);
+
+  try {
+    // XHR for progress
+    await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${API}/api/upload`);
+      xhr.upload.addEventListener('progress', e => {
+        if (e.lengthComputable) {
+          const pct = Math.round((e.loaded / e.total) * 100);
+          pf.style.width = pct + '%';
+          ps.textContent = `アップロード中... ${pct}%`;
+        }
+      });
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const data = JSON.parse(xhr.responseText);
+          ps.textContent = '完了';
+          pf.style.width = '100%';
+          showResult(`予約完了！ 配信開始: ${fmtDate(data.scheduled_start)} → ${fmtDate(data.scheduled_end)}`, 'success');
+          // Reset form
+          document.getElementById('f-title').value = '';
+          document.getElementById('f-broadcaster').value = '';
+          document.getElementById('f-file').value = '';
+          document.getElementById('dropzone-selected').textContent = '';
+          resolve();
+        } else {
+          const err = JSON.parse(xhr.responseText);
+          reject(new Error(err.detail || 'アップロード失敗'));
+        }
+      });
+      xhr.addEventListener('error', () => reject(new Error('ネットワークエラー')));
+      xhr.send(fd);
+    });
+  } catch(e) {
+    ps.textContent = 'エラー';
+    showResult(e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    setTimeout(() => { pw.classList.remove('show'); }, 3000);
+    renderSchedule();
+  }
+}
+
+function showResult(msg, type) {
+  const el = document.getElementById('result-msg');
+  el.textContent = msg;
+  el.className = `result-msg show ${type}`;
+  setTimeout(() => el.classList.remove('show'), 8000);
+}
+
+// ── Delete ────────────────────────────────────────────────────────────────────
+async function doDelete(id) {
+  if (!confirm('この配信予約を削除しますか？')) return;
+  try {
+    const r = await fetch(`${API}/api/queue/${id}`, { method: 'DELETE' });
+    if (!r.ok) throw new Error((await r.json()).detail);
+    renderSchedule();
+  } catch(e) {
+    alert(e.message);
+  }
+}
+
+// ── Skip ─────────────────────────────────────────────────────────────────────
+async function doSkip() {
+  if (!confirm('現在の配信をスキップして次へ移行しますか？')) return;
+  try {
+    await fetch(`${API}/api/skip`, { method: 'POST' });
+    setTimeout(() => { fetchStatus(); renderSchedule(); }, 500);
+  } catch(e) {
+    alert('スキップ失敗: ' + e.message);
+  }
+}
+
+// ── Poll ──────────────────────────────────────────────────────────────────────
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+// Initial tab setup
+document.getElementById('page-viewer').classList.add('active');
+
+// Poll status every 3 seconds
+fetchStatus();
+setInterval(fetchStatus, 3000);
+</script>
+</body>
+</html>
