@@ -32,8 +32,10 @@ logger = logging.getLogger("xch")
 
 # ── aiortc optional ────────────────────────────────────────────────────────────
 try:
-    from aiortc import RTCPeerConnection, RTCSessionDescription, RTCIceCandidate
+    from aiortc import RTCPeerConnection, RTCSessionDescription
     from aiortc.contrib.media import MediaRelay
+    # RTCIceCandidate は candidate_from_sdp で生成するのが正しいAPI
+    from aioice.candidate import Candidate as _AioiceCandidate
     AIORTC = True
     relay = MediaRelay()
     logger.info("aiortc OK — SFU mode")
@@ -41,6 +43,30 @@ except ImportError:
     AIORTC = False
     relay = None
     logger.warning("aiortc missing — P2P relay mode")
+
+def _parse_ice_candidate(c: dict):
+    """
+    ブラウザから届く RTCIceCandidate JSON を aiortc が受け付ける形に変換する。
+    aiortc>=1.6 では addIceCandidate() に dict を直接渡せない。
+    RTCIceCandidate オブジェクトを candidate_from_sdp() 経由で作る。
+    """
+    if not AIORTC:
+        return None
+    from aiortc.sdp import candidate_from_sdp
+    raw = c.get("candidate", "")          # "candidate:..." or "..."
+    if not raw:
+        return None
+    # ブラウザは "candidate:..." の形で送ってくる場合がある
+    if raw.startswith("candidate:"):
+        raw = raw[len("candidate:"):]
+    try:
+        cand = candidate_from_sdp(raw)
+        cand.sdpMid         = c.get("sdpMid")
+        cand.sdpMLineIndex  = c.get("sdpMLineIndex")
+        return cand
+    except Exception as e:
+        logger.warning(f"[ICE parse] {e} — raw={raw!r}")
+        return None
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 BASE_DIR   = Path(__file__).parent
@@ -74,12 +100,17 @@ def recalc_schedule(db: dict):
         cursor = end
 
 # ── Global WebRTC state ────────────────────────────────────────────────────────
-webrtc_session: Optional[dict]        = None   # 現在のライブ配信メタ情報
-broadcaster_pc: Optional[object]      = None   # RTCPeerConnection (SFUモード)
-broadcaster_tracks: list              = []      # リレー済みトラック
-viewer_pcs: Dict[str, object]         = {}      # viewer_id → RTCPeerConnection
+webrtc_session: Optional[dict]        = None
+broadcaster_pc: Optional[object]      = None
+broadcaster_tracks: list              = []
+viewer_pcs: Dict[str, object]         = {}
 broadcaster_ws: Optional[WebSocket]   = None
 viewer_ws_map: Dict[str, WebSocket]   = {}
+# ICE candidate buffers (setRemoteDescription完了前に届いたものを保存)
+_bc_ice_buf: list       = []
+_bc_remote_set: bool    = False
+_vw_ice_buf: Dict[str, list] = {}
+_vw_remote_set: set          = set()
 
 # ── FastAPI ────────────────────────────────────────────────────────────────────
 app = FastAPI(title="Xch")
@@ -273,6 +304,7 @@ async def skip():
 @app.websocket("/ws/broadcast")
 async def ws_broadcast(ws: WebSocket):
     global broadcaster_ws, broadcaster_pc, broadcaster_tracks, webrtc_session
+    global _bc_ice_buf, _bc_remote_set
     await ws.accept()
 
     if broadcaster_ws is not None:
@@ -308,24 +340,32 @@ async def ws_broadcast(ws: WebSocket):
             # ── SDP offer → サーバーSFU (aiortcあり) ─────────────────────
             elif mtype == "offer" and AIORTC:
                 if broadcaster_pc:
-                    await broadcaster_pc.close()
+                    try: await broadcaster_pc.close()
+                    except: pass
                 broadcaster_pc = RTCPeerConnection()
                 broadcaster_tracks.clear()
+                _bc_ice_buf.clear()
+                _bc_remote_set = False
 
                 @broadcaster_pc.on("track")
                 async def on_track(track):
                     logger.info(f"[WebRTC] Track: {track.kind}")
                     bt = relay.subscribe(track)
                     broadcaster_tracks.append(bt)
-                    # 既存視聴者にトラック追加
                     for vid, vpc in list(viewer_pcs.items()):
-                        try:
-                            vpc.addTrack(relay.subscribe(track))
-                        except Exception as ex:
-                            logger.warning(f"add track viewer {vid}: {ex}")
+                        try: vpc.addTrack(relay.subscribe(track))
+                        except Exception as ex: logger.warning(f"add track {vid}: {ex}")
 
                 await broadcaster_pc.setRemoteDescription(
                     RTCSessionDescription(sdp=msg["sdp"], type=msg.get("sdpType","offer")))
+                _bc_remote_set = True
+
+                # バッファに溜まっていたICE candidateを適用
+                for buffered in _bc_ice_buf:
+                    try: await broadcaster_pc.addIceCandidate(buffered)
+                    except Exception as e: logger.warning(f"[ICE flush] {e}")
+                _bc_ice_buf.clear()
+
                 answer = await broadcaster_pc.createAnswer()
                 await broadcaster_pc.setLocalDescription(answer)
                 await ws.send_json({"type": "answer",
@@ -333,12 +373,16 @@ async def ws_broadcast(ws: WebSocket):
                                     "sdpType": broadcaster_pc.localDescription.type})
 
             # ── ICE candidate (broadcaster→server SFU) ────────────────────
-            elif mtype == "ice" and AIORTC and broadcaster_pc:
+            elif mtype == "ice" and AIORTC:
                 c = msg.get("candidate") or {}
-                if c.get("candidate"):
-                    await broadcaster_pc.addIceCandidate(RTCIceCandidate(
-                        sdpMid=c.get("sdpMid"), sdpMLineIndex=c.get("sdpMLineIndex"),
-                        candidate=c["candidate"]))
+                cand = _parse_ice_candidate(c)
+                if cand:
+                    if _bc_remote_set and broadcaster_pc:
+                        try: await broadcaster_pc.addIceCandidate(cand)
+                        except Exception as e: logger.warning(f"[ICE add] {e}")
+                    else:
+                        _bc_ice_buf.append(cand)
+                        logger.debug(f"[ICE] buffered (remote not set yet)")
 
             # ── P2Pリレー: 視聴者のofferへの回答を視聴者へ転送 ───────────
             elif mtype == "answer_viewer":
@@ -395,6 +439,13 @@ async def ws_view(ws: WebSocket, viewer_id: str):
 
             # ── SFUモード: 視聴者offer → サーバー ────────────────────────
             if mtype == "offer" and AIORTC:
+                # 既存PCをクリーンアップ
+                if viewer_id in viewer_pcs:
+                    try: await viewer_pcs[viewer_id].close()
+                    except: pass
+                _vw_ice_buf[viewer_id] = []
+                _vw_remote_set.discard(viewer_id)
+
                 vpc = RTCPeerConnection()
                 viewer_pcs[viewer_id] = vpc
                 for bt in broadcaster_tracks:
@@ -402,6 +453,14 @@ async def ws_view(ws: WebSocket, viewer_id: str):
 
                 await vpc.setRemoteDescription(
                     RTCSessionDescription(sdp=msg["sdp"], type=msg.get("sdpType","offer")))
+                _vw_remote_set.add(viewer_id)
+
+                # バッファを適用
+                for buffered in _vw_ice_buf.get(viewer_id, []):
+                    try: await vpc.addIceCandidate(buffered)
+                    except Exception as e: logger.warning(f"[ICE viewer flush] {e}")
+                _vw_ice_buf.pop(viewer_id, None)
+
                 answer = await vpc.createAnswer()
                 await vpc.setLocalDescription(answer)
                 await ws.send_json({"type": "answer",
@@ -409,12 +468,15 @@ async def ws_view(ws: WebSocket, viewer_id: str):
                                     "sdpType": vpc.localDescription.type})
 
             # ── SFUモード: ICE candidate (viewer→server) ──────────────────
-            elif mtype == "ice" and AIORTC and viewer_id in viewer_pcs:
+            elif mtype == "ice" and AIORTC:
                 c = msg.get("candidate") or {}
-                if c.get("candidate"):
-                    await viewer_pcs[viewer_id].addIceCandidate(RTCIceCandidate(
-                        sdpMid=c.get("sdpMid"), sdpMLineIndex=c.get("sdpMLineIndex"),
-                        candidate=c["candidate"]))
+                cand = _parse_ice_candidate(c)
+                if cand:
+                    if viewer_id in _vw_remote_set and viewer_id in viewer_pcs:
+                        try: await viewer_pcs[viewer_id].addIceCandidate(cand)
+                        except Exception as e: logger.warning(f"[ICE viewer] {e}")
+                    else:
+                        _vw_ice_buf.setdefault(viewer_id, []).append(cand)
 
             # ── P2Pリレー: 視聴者のofferを配信者へ ───────────────────────
             elif mtype == "offer" and not AIORTC:
@@ -455,10 +517,15 @@ async def _broadcast_viewers(data: dict):
 
 async def _end_webrtc():
     global webrtc_session, broadcaster_pc, broadcaster_tracks
+    global _bc_ice_buf, _bc_remote_set, _vw_ice_buf, _vw_remote_set
     if not webrtc_session:
         return
     webrtc_session = None
     broadcaster_tracks.clear()
+    _bc_ice_buf.clear()
+    _bc_remote_set = False
+    _vw_ice_buf.clear()
+    _vw_remote_set.clear()
     if broadcaster_pc:
         try: await broadcaster_pc.close()
         except: pass
