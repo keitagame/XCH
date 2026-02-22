@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: xch
+    env: python
+    plan: free   # 有料にするなら「starter」や「standard」
+    buildCommand: |
+      apt-get update && apt-get install -y ffmpeg
+      pip install -r requirements.txt
+    startCommand: python app.py
