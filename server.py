@@ -1,28 +1,48 @@
 """
-Xch Broadcasting Service - Backend
-====================================
-pip install fastapi uvicorn python-multipart aiofiles apscheduler
-uvicorn server:app --reload --port 8000
+Xch Broadcasting Service — Backend
+=====================================
+pip install fastapi uvicorn python-multipart aiofiles apscheduler aiortc
+
+WebRTC方式:
+  aiortcあり → サーバーSFUとして配信者トラックを全視聴者へリレー
+  aiortcなし → WebSocketシグナリングリレー（ブラウザ間P2P）
+
+起動:
+  uvicorn server:app --reload --port 8000
 """
 
-import os
 import json
 import uuid
 import asyncio
+import logging
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Dict
 
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request
-from fastapi.responses import (
-    JSONResponse, StreamingResponse, FileResponse, HTMLResponse
-)
+from fastapi import (FastAPI, File, UploadFile, Form,
+                     HTTPException, Request, WebSocket, WebSocketDisconnect)
+from fastapi.responses import StreamingResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import aiofiles
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-# ── Paths ─────────────────────────────────────────────────────────────────────
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("xch")
+
+# ── aiortc optional ────────────────────────────────────────────────────────────
+try:
+    from aiortc import RTCPeerConnection, RTCSessionDescription, RTCIceCandidate
+    from aiortc.contrib.media import MediaRelay
+    AIORTC = True
+    relay = MediaRelay()
+    logger.info("aiortc OK — SFU mode")
+except ImportError:
+    AIORTC = False
+    relay = None
+    logger.warning("aiortc missing — P2P relay mode")
+
+# ── Paths ──────────────────────────────────────────────────────────────────────
 BASE_DIR   = Path(__file__).parent
 UPLOAD_DIR = BASE_DIR / "uploads"
 STATIC_DIR = BASE_DIR / "static"
@@ -30,130 +50,75 @@ DB_PATH    = BASE_DIR / "schedule.json"
 UPLOAD_DIR.mkdir(exist_ok=True)
 STATIC_DIR.mkdir(exist_ok=True)
 
-# ── State ──────────────────────────────────────────────────────────────────────
-# schedule.json schema:
-# {
-#   "queue": [
-#     {
-#       "id": "uuid",
-#       "filename": "original_name.mp4",
-#       "path": "uploads/uuid.mp4",
-#       "title": "配信タイトル",
-#       "broadcaster": "配信者名",
-#       "duration_hours": 2,          # 配信者が指定した配信時間
-#       "scheduled_start": "ISO8601", # 予定開始時刻
-#       "scheduled_end": "ISO8601",   # 予定終了時刻
-#       "status": "queued|live|done"
-#     },
-#     ...
-#   ],
-#   "current_index": 0
-# }
-
+# ── DB ─────────────────────────────────────────────────────────────────────────
 def load_db() -> dict:
     if DB_PATH.exists():
-        with open(DB_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
+        return json.loads(DB_PATH.read_text(encoding="utf-8"))
     return {"queue": [], "current_index": 0}
 
 def save_db(data: dict):
-    with open(DB_PATH, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    DB_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 def recalc_schedule(db: dict):
-    """queueの順番から開始・終了時刻を再計算する。
-    現在liveなものはそのまま。その後は順番に連結。"""
-    now = datetime.now()
-    cursor = now
-
-    # 現在liveのエントリがあればそこから始める
+    cursor = datetime.now()
     for item in db["queue"]:
         if item["status"] == "live":
-            # liveのendをcursorに
             cursor = datetime.fromisoformat(item["scheduled_end"])
             break
-
     for item in db["queue"]:
-        if item["status"] in ("done",):
+        if item["status"] in ("done", "live"):
             continue
-        if item["status"] == "live":
-            continue  # liveは変更しない
-        # queued
-        start = cursor
-        end = start + timedelta(hours=item["duration_hours"])
-        item["scheduled_start"] = start.isoformat()
+        end = cursor + timedelta(hours=item["duration_hours"])
+        item["scheduled_start"] = cursor.isoformat()
         item["scheduled_end"]   = end.isoformat()
         cursor = end
 
-# ── App ────────────────────────────────────────────────────────────────────────
+# ── Global WebRTC state ────────────────────────────────────────────────────────
+webrtc_session: Optional[dict]        = None   # 現在のライブ配信メタ情報
+broadcaster_pc: Optional[object]      = None   # RTCPeerConnection (SFUモード)
+broadcaster_tracks: list              = []      # リレー済みトラック
+viewer_pcs: Dict[str, object]         = {}      # viewer_id → RTCPeerConnection
+broadcaster_ws: Optional[WebSocket]   = None
+viewer_ws_map: Dict[str, WebSocket]   = {}
+
+# ── FastAPI ────────────────────────────────────────────────────────────────────
 app = FastAPI(title="Xch")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Static files (HTML, CSS, fonts)
+app.add_middleware(CORSMiddleware, allow_origins=["*"],
+                  allow_methods=["*"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-# ── Scheduler ─────────────────────────────────────────────────────────────────
+# ── Scheduler ──────────────────────────────────────────────────────────────────
 scheduler = AsyncIOScheduler()
 
 def advance_broadcast():
-    """現在の配信を終了し次へ。スケジューラから呼ばれる。"""
     db = load_db()
-    queue = db["queue"]
-
-    # 現在liveをdoneに
-    for i, item in enumerate(queue):
+    for i, item in enumerate(db["queue"]):
         if item["status"] == "live":
             item["status"] = "done"
             db["current_index"] = i + 1
             break
-
-    # 次のqueuedを探してliveに
-    for item in queue:
+    for item in db["queue"]:
         if item["status"] == "queued":
-            item["status"] = "live"
-            # 実際の開始時刻を今に更新
             now = datetime.now()
             end = now + timedelta(hours=item["duration_hours"])
+            item["status"] = "live"
             item["scheduled_start"] = now.isoformat()
             item["scheduled_end"]   = end.isoformat()
-            # 次のadvanceをスケジュール
-            scheduler.add_job(
-                advance_broadcast,
-                "date",
-                run_date=end,
-                id="next_advance",
-                replace_existing=True,
-            )
+            scheduler.add_job(advance_broadcast, "date", run_date=end,
+                              id="next_advance", replace_existing=True)
             break
-
     save_db(db)
-    print(f"[Scheduler] Advanced broadcast at {datetime.now()}")
 
 def maybe_start_first():
-    """アプリ起動時、liveがなければ最初のqueuedをliveにする。"""
     db = load_db()
-    has_live = any(item["status"] == "live" for item in db["queue"])
-    if has_live:
-        # 既存のliveのendでジョブを登録
+    if any(i["status"] == "live" for i in db["queue"]):
         for item in db["queue"]:
             if item["status"] == "live":
                 end = datetime.fromisoformat(item["scheduled_end"])
                 if end > datetime.now():
-                    scheduler.add_job(
-                        advance_broadcast,
-                        "date",
-                        run_date=end,
-                        id="next_advance",
-                        replace_existing=True,
-                    )
+                    scheduler.add_job(advance_broadcast, "date", run_date=end,
+                                      id="next_advance", replace_existing=True)
         return
-
     for item in db["queue"]:
         if item["status"] == "queued":
             now = datetime.now()
@@ -162,61 +127,55 @@ def maybe_start_first():
             item["scheduled_start"] = now.isoformat()
             item["scheduled_end"]   = end.isoformat()
             save_db(db)
-            scheduler.add_job(
-                advance_broadcast,
-                "date",
-                run_date=end,
-                id="next_advance",
-                replace_existing=True,
-            )
+            scheduler.add_job(advance_broadcast, "date", run_date=end,
+                              id="next_advance", replace_existing=True)
             return
 
 @app.on_event("startup")
-async def startup():
+async def _startup():
     scheduler.start()
     maybe_start_first()
 
 @app.on_event("shutdown")
-async def shutdown():
+async def _shutdown():
     scheduler.shutdown()
 
-# ── API Endpoints ──────────────────────────────────────────────────────────────
-
+# ── HTTP ───────────────────────────────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 async def index():
-    html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
-    return HTMLResponse(html)
-
-# ---- 配信状況 ---------------------------------------------------------------
+    return HTMLResponse((STATIC_DIR / "index.html").read_text(encoding="utf-8"))
 
 @app.get("/api/status")
 async def get_status():
-    """現在の配信状況とキューを返す"""
-    db = load_db()
+    db  = load_db()
     now = datetime.now()
 
-    current = None
-    for item in db["queue"]:
-        if item["status"] == "live":
-            current = item
-            break
+    if webrtc_session:
+        started  = datetime.fromisoformat(webrtc_session["started_at"])
+        end_dt   = started + timedelta(hours=webrtc_session["duration_hours"])
+        remaining = max(0, (end_dt - now).total_seconds())
+        return {
+            "is_live": True, "webrtc_live": True, "aiortc": AIORTC,
+            "current": {**webrtc_session, "id": "webrtc-live", "type": "webrtc",
+                        "status": "live", "remaining_seconds": remaining,
+                        "scheduled_start": webrtc_session["started_at"],
+                        "scheduled_end": end_dt.isoformat()},
+            "queue": [i for i in db["queue"] if i["status"] != "done"],
+            "viewer_count": len(viewer_ws_map),
+            "server_time": now.isoformat(),
+        }
 
+    current = next((i for i in db["queue"] if i["status"] == "live"), None)
     queue_items = [
-        {**item, "remaining_seconds": max(0, (
-            datetime.fromisoformat(item["scheduled_end"]) - now
-        ).total_seconds()) if item["status"] == "live" else None}
-        for item in db["queue"]
-        if item["status"] != "done"
+        {**i, "remaining_seconds": max(0, (datetime.fromisoformat(i["scheduled_end"]) - now).total_seconds())
+         if i["status"] == "live" else None}
+        for i in db["queue"] if i["status"] != "done"
     ]
-
     return {
-        "is_live": current is not None,
-        "current": current,
-        "queue": queue_items,
+        "is_live": current is not None, "webrtc_live": False, "aiortc": AIORTC,
+        "current": current, "queue": queue_items, "viewer_count": 0,
         "server_time": now.isoformat(),
     }
-
-# ---- 動画アップロード・予約 -------------------------------------------------
 
 @app.post("/api/upload")
 async def upload_video(
@@ -225,149 +184,289 @@ async def upload_video(
     broadcaster: str = Form(...),
     duration_hours: float = Form(...),
 ):
-    """動画をアップロードしてキューに追加する"""
-    # ファイル保存
     ext = Path(file.filename).suffix.lower()
     if ext not in (".mp4", ".webm", ".mov", ".mkv"):
-        raise HTTPException(400, "対応フォーマット: mp4, webm, mov, mkv")
+        raise HTTPException(400, "対応: mp4 webm mov mkv")
 
-    file_id   = str(uuid.uuid4())
-    save_name = f"{file_id}{ext}"
-    save_path = UPLOAD_DIR / save_name
-
-    async with aiofiles.open(save_path, "wb") as f:
-        while chunk := await file.read(1024 * 1024):  # 1MB chunks
+    fid  = str(uuid.uuid4())
+    path = UPLOAD_DIR / f"{fid}{ext}"
+    async with aiofiles.open(path, "wb") as f:
+        while chunk := await file.read(1 << 20):
             await f.write(chunk)
 
-    # スケジュール計算
-    db = load_db()
-    now = datetime.now()
-
-    # queuedの最後の終了時刻 or liveの終了時刻の後
-    cursor = now
+    db     = load_db()
+    cursor = datetime.now()
     for item in reversed(db["queue"]):
         if item["status"] in ("queued", "live"):
             cursor = datetime.fromisoformat(item["scheduled_end"])
             break
 
-    start = cursor
-    end   = start + timedelta(hours=duration_hours)
-
-    entry = {
-        "id": file_id,
-        "filename": file.filename,
-        "path": f"uploads/{save_name}",
-        "title": title,
-        "broadcaster": broadcaster,
-        "duration_hours": duration_hours,
-        "scheduled_start": start.isoformat(),
-        "scheduled_end": end.isoformat(),
+    end = cursor + timedelta(hours=duration_hours)
+    db["queue"].append({
+        "id": fid, "type": "file", "filename": file.filename,
+        "path": f"uploads/{fid}{ext}", "title": title,
+        "broadcaster": broadcaster, "duration_hours": duration_hours,
+        "scheduled_start": cursor.isoformat(), "scheduled_end": end.isoformat(),
         "status": "queued",
-    }
-
-    db["queue"].append(entry)
+    })
     save_db(db)
-
-    # もし今liveがなければ即開始
-    has_live = any(i["status"] == "live" for i in db["queue"])
-    if not has_live:
+    if not any(i["status"] == "live" for i in db["queue"]):
         maybe_start_first()
-
-    return {
-        "id": file_id,
-        "scheduled_start": start.isoformat(),
-        "scheduled_end": end.isoformat(),
-        "message": "予約完了",
-    }
-
-# ---- 動画ストリーミング -----------------------------------------------------
+    return {"id": fid, "scheduled_start": cursor.isoformat(),
+            "scheduled_end": end.isoformat(), "message": "予約完了"}
 
 @app.get("/api/stream/{file_id}")
 async def stream_video(file_id: str, request: Request):
-    """HTTP Range対応のビデオストリーミング"""
-    db = load_db()
-
-    # file_idに対応するエントリを探す
-    entry = next((item for item in db["queue"] if item["id"] == file_id), None)
+    db    = load_db()
+    entry = next((i for i in db["queue"] if i["id"] == file_id), None)
     if not entry:
-        raise HTTPException(404, "動画が見つかりません")
+        raise HTTPException(404, "Not found")
+    vp = BASE_DIR / entry["path"]
+    if not vp.exists():
+        raise HTTPException(404, "File missing")
 
-    video_path = BASE_DIR / entry["path"]
-    if not video_path.exists():
-        raise HTTPException(404, "ファイルが見つかりません")
+    size = vp.stat().st_size
+    ct   = {".mp4": "video/mp4", ".webm": "video/webm",
+            ".mov": "video/quicktime", ".mkv": "video/x-matroska"}.get(vp.suffix.lower(), "video/mp4")
 
-    file_size = video_path.stat().st_size
-    ext = video_path.suffix.lower()
-    content_type = {
-        ".mp4":  "video/mp4",
-        ".webm": "video/webm",
-        ".mov":  "video/quicktime",
-        ".mkv":  "video/x-matroska",
-    }.get(ext, "video/mp4")
+    rh = request.headers.get("range")
+    if rh:
+        s, e = rh.replace("bytes=", "").split("-")
+        s = int(s); e = int(e) if e else size - 1; n = e - s + 1
+        async def ranged():
+            async with aiofiles.open(vp, "rb") as f:
+                await f.seek(s)
+                rem = n
+                while rem > 0:
+                    d = await f.read(min(65536, rem))
+                    if not d: break
+                    rem -= len(d); yield d
+        return StreamingResponse(ranged(), 206, headers={
+            "Content-Range": f"bytes {s}-{e}/{size}", "Accept-Ranges": "bytes",
+            "Content-Length": str(n), "Content-Type": ct})
 
-    # Range ヘッダー処理
-    range_header = request.headers.get("range")
-    if range_header:
-        range_start, range_end = range_header.replace("bytes=", "").split("-")
-        range_start = int(range_start)
-        range_end   = int(range_end) if range_end else file_size - 1
-        chunk_size  = range_end - range_start + 1
-
-        async def file_iterator():
-            async with aiofiles.open(video_path, "rb") as f:
-                await f.seek(range_start)
-                remaining = chunk_size
-                while remaining > 0:
-                    read_size = min(65536, remaining)
-                    data = await f.read(read_size)
-                    if not data:
-                        break
-                    remaining -= len(data)
-                    yield data
-
-        return StreamingResponse(
-            file_iterator(),
-            status_code=206,
-            headers={
-                "Content-Range": f"bytes {range_start}-{range_end}/{file_size}",
-                "Accept-Ranges": "bytes",
-                "Content-Length": str(chunk_size),
-                "Content-Type": content_type,
-            },
-        )
-
-    # Rangeなし
-    async def full_iterator():
-        async with aiofiles.open(video_path, "rb") as f:
-            while chunk := await f.read(65536):
-                yield chunk
-
-    return StreamingResponse(
-        full_iterator(),
-        headers={
-            "Accept-Ranges": "bytes",
-            "Content-Length": str(file_size),
-            "Content-Type": content_type,
-        },
-    )
-
-# ---- 管理: キュー削除 -------------------------------------------------------
+    async def full():
+        async with aiofiles.open(vp, "rb") as f:
+            while c := await f.read(65536): yield c
+    return StreamingResponse(full(), headers={"Accept-Ranges": "bytes",
+        "Content-Length": str(size), "Content-Type": ct})
 
 @app.delete("/api/queue/{file_id}")
-async def delete_from_queue(file_id: str):
+async def delete_queue(file_id: str):
     db = load_db()
-    original = len(db["queue"])
-    db["queue"] = [i for i in db["queue"] if i["id"] != file_id or i["status"] == "live"]
-    if len(db["queue"]) == original:
-        raise HTTPException(404, "見つからないか配信中のため削除できません")
-    recalc_schedule(db)
-    save_db(db)
+    prev = len(db["queue"])
+    db["queue"] = [i for i in db["queue"] if not (i["id"] == file_id and i["status"] != "live")]
+    if len(db["queue"]) == prev:
+        raise HTTPException(404, "削除できません")
+    recalc_schedule(db); save_db(db)
     return {"message": "削除しました"}
 
-# ---- 管理: 今すぐスキップ ---------------------------------------------------
-
 @app.post("/api/skip")
-async def skip_current():
-    """現在の配信を強制スキップ"""
+async def skip():
     advance_broadcast()
     return {"message": "スキップしました"}
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  WebRTC シグナリング WebSocket
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.websocket("/ws/broadcast")
+async def ws_broadcast(ws: WebSocket):
+    global broadcaster_ws, broadcaster_pc, broadcaster_tracks, webrtc_session
+    await ws.accept()
+
+    if broadcaster_ws is not None:
+        await ws.send_json({"type": "error", "message": "既に配信中です"})
+        await ws.close(); return
+
+    broadcaster_ws = ws
+    logger.info("[WS] Broadcaster connected")
+
+    try:
+        while True:
+            msg   = await ws.receive_json()
+            mtype = msg.get("type")
+
+            # ── セッション開始通知 ────────────────────────────────────────
+            if mtype == "start":
+                webrtc_session = {
+                    "title":          msg.get("title", "Live配信"),
+                    "broadcaster":    msg.get("broadcaster", "配信者"),
+                    "duration_hours": float(msg.get("duration_hours", 1)),
+                    "started_at":     datetime.now().isoformat(),
+                    "type":           "webrtc",
+                }
+                end_dt = datetime.now() + timedelta(hours=webrtc_session["duration_hours"])
+                scheduler.add_job(_end_webrtc, "date", run_date=end_dt,
+                                  id="webrtc_end", replace_existing=True)
+                await ws.send_json({"type": "started", "aiortc": AIORTC,
+                                    "session": webrtc_session})
+                await _broadcast_viewers({"type": "stream_start",
+                                         "session": webrtc_session})
+                logger.info(f"[WebRTC] Session: {webrtc_session['title']}")
+
+            # ── SDP offer → サーバーSFU (aiortcあり) ─────────────────────
+            elif mtype == "offer" and AIORTC:
+                if broadcaster_pc:
+                    await broadcaster_pc.close()
+                broadcaster_pc = RTCPeerConnection()
+                broadcaster_tracks.clear()
+
+                @broadcaster_pc.on("track")
+                async def on_track(track):
+                    logger.info(f"[WebRTC] Track: {track.kind}")
+                    bt = relay.subscribe(track)
+                    broadcaster_tracks.append(bt)
+                    # 既存視聴者にトラック追加
+                    for vid, vpc in list(viewer_pcs.items()):
+                        try:
+                            vpc.addTrack(relay.subscribe(track))
+                        except Exception as ex:
+                            logger.warning(f"add track viewer {vid}: {ex}")
+
+                await broadcaster_pc.setRemoteDescription(
+                    RTCSessionDescription(sdp=msg["sdp"], type=msg.get("sdpType","offer")))
+                answer = await broadcaster_pc.createAnswer()
+                await broadcaster_pc.setLocalDescription(answer)
+                await ws.send_json({"type": "answer",
+                                    "sdp": broadcaster_pc.localDescription.sdp,
+                                    "sdpType": broadcaster_pc.localDescription.type})
+
+            # ── ICE candidate (broadcaster→server SFU) ────────────────────
+            elif mtype == "ice" and AIORTC and broadcaster_pc:
+                c = msg.get("candidate") or {}
+                if c.get("candidate"):
+                    await broadcaster_pc.addIceCandidate(RTCIceCandidate(
+                        sdpMid=c.get("sdpMid"), sdpMLineIndex=c.get("sdpMLineIndex"),
+                        candidate=c["candidate"]))
+
+            # ── P2Pリレー: 視聴者のofferへの回答を視聴者へ転送 ───────────
+            elif mtype == "answer_viewer":
+                vid = msg.get("viewer_id")
+                if vid in viewer_ws_map:
+                    await viewer_ws_map[vid].send_json({
+                        "type": "broadcaster_answer",
+                        "sdp": msg.get("sdp"), "sdpType": msg.get("sdpType","answer")})
+
+            # ── P2Pリレー: ICE candidateを特定視聴者へ ───────────────────
+            elif mtype == "ice_relay":
+                vid = msg.get("viewer_id")
+                payload = {"type": "broadcaster_ice", "candidate": msg.get("candidate")}
+                if vid and vid in viewer_ws_map:
+                    await viewer_ws_map[vid].send_json(payload)
+                else:
+                    await _broadcast_viewers(payload)
+
+            # ── 配信終了 ──────────────────────────────────────────────────
+            elif mtype == "end":
+                await _end_webrtc()
+                await ws.send_json({"type": "ended"})
+
+    except WebSocketDisconnect:
+        logger.info("[WS] Broadcaster disconnected")
+    except Exception as e:
+        logger.error(f"[WS Broadcast] {e}")
+    finally:
+        broadcaster_ws = None
+        await _end_webrtc()
+
+
+@app.websocket("/ws/view/{viewer_id}")
+async def ws_view(ws: WebSocket, viewer_id: str):
+    await ws.accept()
+    viewer_ws_map[viewer_id] = ws
+    logger.info(f"[WS] Viewer {viewer_id}")
+
+    # セッション情報を送る
+    if webrtc_session:
+        await ws.send_json({"type": "stream_start", "session": webrtc_session,
+                            "aiortc": AIORTC})
+    else:
+        await ws.send_json({"type": "no_stream", "aiortc": AIORTC})
+
+    # P2Pモード: 配信者に新規視聴者を通知
+    if broadcaster_ws and not AIORTC and webrtc_session:
+        await broadcaster_ws.send_json({"type": "new_viewer", "viewer_id": viewer_id})
+
+    try:
+        while True:
+            msg   = await ws.receive_json()
+            mtype = msg.get("type")
+
+            # ── SFUモード: 視聴者offer → サーバー ────────────────────────
+            if mtype == "offer" and AIORTC:
+                vpc = RTCPeerConnection()
+                viewer_pcs[viewer_id] = vpc
+                for bt in broadcaster_tracks:
+                    vpc.addTrack(bt)
+
+                await vpc.setRemoteDescription(
+                    RTCSessionDescription(sdp=msg["sdp"], type=msg.get("sdpType","offer")))
+                answer = await vpc.createAnswer()
+                await vpc.setLocalDescription(answer)
+                await ws.send_json({"type": "answer",
+                                    "sdp": vpc.localDescription.sdp,
+                                    "sdpType": vpc.localDescription.type})
+
+            # ── SFUモード: ICE candidate (viewer→server) ──────────────────
+            elif mtype == "ice" and AIORTC and viewer_id in viewer_pcs:
+                c = msg.get("candidate") or {}
+                if c.get("candidate"):
+                    await viewer_pcs[viewer_id].addIceCandidate(RTCIceCandidate(
+                        sdpMid=c.get("sdpMid"), sdpMLineIndex=c.get("sdpMLineIndex"),
+                        candidate=c["candidate"]))
+
+            # ── P2Pリレー: 視聴者のofferを配信者へ ───────────────────────
+            elif mtype == "offer" and not AIORTC:
+                if broadcaster_ws:
+                    await broadcaster_ws.send_json({
+                        "type": "viewer_offer", "viewer_id": viewer_id,
+                        "sdp": msg.get("sdp"), "sdpType": msg.get("sdpType","offer")})
+
+            # ── P2Pリレー: 視聴者のICE → 配信者へ ───────────────────────
+            elif mtype == "ice" and not AIORTC:
+                if broadcaster_ws:
+                    await broadcaster_ws.send_json({
+                        "type": "viewer_ice", "viewer_id": viewer_id,
+                        "candidate": msg.get("candidate")})
+
+    except WebSocketDisconnect:
+        logger.info(f"[WS] Viewer {viewer_id} left")
+    except Exception as e:
+        logger.error(f"[WS View] {viewer_id}: {e}")
+    finally:
+        viewer_ws_map.pop(viewer_id, None)
+        if viewer_id in viewer_pcs:
+            try: await viewer_pcs[viewer_id].close()
+            except: pass
+            viewer_pcs.pop(viewer_id, None)
+
+
+# ── helpers ────────────────────────────────────────────────────────────────────
+async def _broadcast_viewers(data: dict):
+    dead = []
+    for vid, vws in list(viewer_ws_map.items()):
+        try:
+            await vws.send_json(data)
+        except:
+            dead.append(vid)
+    for vid in dead:
+        viewer_ws_map.pop(vid, None)
+
+async def _end_webrtc():
+    global webrtc_session, broadcaster_pc, broadcaster_tracks
+    if not webrtc_session:
+        return
+    webrtc_session = None
+    broadcaster_tracks.clear()
+    if broadcaster_pc:
+        try: await broadcaster_pc.close()
+        except: pass
+        broadcaster_pc = None
+    for vpc in list(viewer_pcs.values()):
+        try: await vpc.close()
+        except: pass
+    viewer_pcs.clear()
+    await _broadcast_viewers({"type": "stream_end"})
+    maybe_start_first()
+    logger.info("[WebRTC] Session ended")
