@@ -10,569 +10,202 @@
   src: url("/static/Renner.ttf") format("truetype");
   font-display: swap;
 }
-
 :root {
-  --bg: #000;
-  --fg: #fff;
-  --dim: #555;
-  --dim2: #333;
-  --accent: #e8ff00;
-  --red: #ff3c00;
-  --panel: #0c0c0c;
-  --border: #1c1c1c;
+  --bg:#000; --fg:#fff; --dim:#555; --dim2:#2a2a2a;
+  --accent:#e8ff00; --red:#ff3c00; --panel:#0c0c0c; --border:#1c1c1c;
 }
-
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-body {
-  background: var(--bg);
-  color: var(--fg);
-  font-family: "Renner", "Arial Narrow", sans-serif;
-  min-height: 100vh;
-}
-
-/* ── NOISE GRAIN ── */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
-  pointer-events: none;
-  z-index: 9999;
-  opacity: 0.4;
-}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--fg);font-family:"Renner","Arial Narrow",sans-serif;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;opacity:.35;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.08'/%3E%3C/svg%3E")}
 
 /* ── NAV ── */
-nav {
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  z-index: 200;
-  height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 28px;
-  background: rgba(0,0,0,0.88);
-  border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(12px);
-}
-
-.logo {
-  font-size: 22px;
-  letter-spacing: 8px;
-  font-weight: 300;
-  user-select: none;
-}
-.logo em { color: var(--accent); font-style: normal; }
-
-.nav-center {
-  display: flex;
-  gap: 1px;
-}
-
-.tab {
-  background: none;
-  border: none;
-  color: var(--dim);
-  font-family: inherit;
-  font-size: 10px;
-  letter-spacing: 4px;
-  text-transform: uppercase;
-  padding: 10px 20px;
-  cursor: pointer;
-  transition: color 0.2s;
-  border-bottom: 1px solid transparent;
-  position: relative;
-}
-.tab:hover { color: #999; }
-.tab.active { color: var(--fg); border-bottom-color: var(--accent); }
-
-.nav-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 10px;
-  letter-spacing: 3px;
-  color: var(--dim);
-}
-
-.live-indicator {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: var(--dim);
-  transition: background 0.4s, box-shadow 0.4s;
-}
-.dot.live { background: var(--red); box-shadow: 0 0 10px var(--red); animation: blink 1.4s infinite; }
-
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
-
-#nav-clock { font-size: 13px; letter-spacing: 3px; }
+nav{position:fixed;top:0;left:0;right:0;z-index:200;height:52px;display:flex;
+  align-items:center;justify-content:space-between;padding:0 28px;
+  background:rgba(0,0,0,.9);border-bottom:1px solid var(--border);backdrop-filter:blur(12px)}
+.logo{font-size:22px;letter-spacing:8px;font-weight:300;user-select:none}
+.logo em{color:var(--accent);font-style:normal}
+.nav-tabs{display:flex;gap:1px}
+.tab{background:none;border:none;color:var(--dim);font-family:inherit;font-size:10px;
+  letter-spacing:4px;text-transform:uppercase;padding:10px 18px;cursor:pointer;
+  transition:color .2s;border-bottom:1px solid transparent}
+.tab:hover{color:#999}
+.tab.active{color:var(--fg);border-bottom-color:var(--accent)}
+.nav-right{display:flex;align-items:center;gap:10px;font-size:10px;letter-spacing:3px;color:var(--dim)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--dim);transition:background .4s,box-shadow .4s}
+.dot.on{background:var(--red);box-shadow:0 0 10px var(--red);animation:blink 1.4s infinite}
+.dot.rtc{background:var(--accent);box-shadow:0 0 10px var(--accent);animation:blink 1.4s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+#nav-clock{font-size:13px;letter-spacing:3px}
 
 /* ── PAGES ── */
-.page { display: none; padding-top: 52px; min-height: 100vh; }
-.page.active { display: block; }
+.page{display:none;padding-top:52px;min-height:100vh}
+#page-viewer{display:none;flex-direction:column;height:100vh;padding-top:52px}
+#page-viewer.active{display:flex}
+#page-broadcast.active,#page-golive.active{display:block}
 
-/* ═══════════════════════════════════
-   VIEWER PAGE
-═══════════════════════════════════ */
-#page-viewer {
-  display: none;
-  flex-direction: column;
-  height: 100vh;
-  padding-top: 52px;
-}
-#page-viewer.active { display: flex; }
+/* ═══ VIEWER ═══ */
+.video-container{flex:1;position:relative;background:#000;overflow:hidden;min-height:0}
+#main-video,#webrtc-video{width:100%;height:100%;object-fit:contain;display:block}
+#webrtc-video{position:absolute;inset:0;display:none}
+#webrtc-video.active{display:block}
 
-/* Video area */
-.video-container {
-  flex: 1;
-  position: relative;
-  background: #000;
-  overflow: hidden;
-  min-height: 0;
-}
+.video-overlay{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:14px;background:#000;transition:opacity .5s}
+.video-overlay.hidden{opacity:0;pointer-events:none}
+.overlay-label{font-size:11px;letter-spacing:6px;color:var(--dim);text-transform:uppercase}
+.overlay-title{font-size:32px;letter-spacing:2px;font-weight:300;max-width:60%;text-align:center}
+.overlay-sub{font-size:11px;letter-spacing:3px;color:var(--dim)}
 
-#main-video {
-  width: 100%; height: 100%;
-  object-fit: contain;
-  display: block;
-}
+/* HUD */
+.hud{position:absolute;pointer-events:none}
+.hud-tl{top:18px;left:22px;display:flex;align-items:center;gap:8px;
+  background:rgba(0,0,0,.6);padding:6px 12px;border-left:2px solid var(--red)}
+.hud-tl.rtc-mode{border-left-color:var(--accent)}
+.hud-live-text{font-size:10px;letter-spacing:4px;color:var(--red)}
+.hud-tl.rtc-mode .hud-live-text{color:var(--accent)}
+.hud-clock-text{font-size:13px;letter-spacing:3px}
+.hud-tr{top:18px;right:22px;background:rgba(0,0,0,.6);padding:6px 12px;text-align:right}
+#hud-title{font-size:11px;letter-spacing:2px;color:#bbb}
+#hud-broadcaster{font-size:10px;letter-spacing:2px;color:var(--dim);margin-top:2px}
+.hud-bl{bottom:18px;left:22px;display:flex;align-items:center;gap:6px;
+  background:rgba(0,0,0,.6);padding:5px 10px}
+.hud-rem-label{font-size:9px;letter-spacing:3px;color:var(--dim)}
+#hud-remaining{font-size:11px;letter-spacing:2px;color:var(--accent)}
+.hud-br{bottom:18px;right:22px;background:rgba(0,0,0,.6);padding:5px 10px}
+#hud-viewers{font-size:10px;letter-spacing:2px;color:var(--dim)}
 
-.video-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  background: #000;
-  transition: opacity 0.5s;
-}
-.video-overlay.hidden { opacity: 0; pointer-events: none; }
+/* Progress */
+.progress-bar-wrap{height:2px;background:var(--border)}
+#progress-bar{height:100%;background:var(--accent);width:0%;transition:width 1s linear}
 
-.overlay-label {
-  font-size: 11px;
-  letter-spacing: 6px;
-  color: var(--dim);
-  text-transform: uppercase;
-}
+/* Next panel */
+.next-up-panel{height:72px;background:var(--panel);border-top:1px solid var(--border);
+  display:flex;align-items:center;padding:0 24px;gap:20px;overflow:hidden}
+.next-label{font-size:9px;letter-spacing:4px;color:var(--dim);text-transform:uppercase;white-space:nowrap;flex-shrink:0}
+.next-divider{width:1px;height:28px;background:var(--border);flex-shrink:0}
+.next-title{font-size:14px;letter-spacing:2px;color:#bbb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.next-meta{font-size:10px;letter-spacing:2px;color:var(--dim);margin-top:3px}
+.next-empty{font-size:11px;letter-spacing:3px;color:var(--dim2)}
 
-.overlay-title {
-  font-size: 32px;
-  letter-spacing: 2px;
-  font-weight: 300;
-  color: #fff;
-  max-width: 60%;
-  text-align: center;
-}
-
-.overlay-sub {
-  font-size: 11px;
-  letter-spacing: 3px;
-  color: var(--dim);
-}
-
-/* HUD overlays on video */
-.hud {
-  position: absolute;
-  pointer-events: none;
-}
-
-.hud-tl {
-  top: 18px; left: 22px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(0,0,0,0.55);
-  padding: 6px 12px;
-  border-left: 2px solid var(--red);
-}
-
-.hud-live-text {
-  font-size: 10px;
-  letter-spacing: 4px;
-  color: var(--red);
-}
-
-.hud-clock {
-  font-size: 13px;
-  letter-spacing: 3px;
-}
-
-.hud-tr {
-  top: 18px; right: 22px;
-  background: rgba(0,0,0,0.55);
-  padding: 6px 12px;
-  text-align: right;
-}
-
-#hud-title {
-  font-size: 11px;
-  letter-spacing: 2px;
-  color: #bbb;
-}
-
-#hud-broadcaster {
-  font-size: 10px;
-  letter-spacing: 2px;
-  color: var(--dim);
-  margin-top: 2px;
-}
-
-.hud-bl {
-  bottom: 18px; left: 22px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: rgba(0,0,0,0.55);
-  padding: 5px 10px;
-}
-
-.hud-remaining-label {
-  font-size: 9px;
-  letter-spacing: 3px;
-  color: var(--dim);
-}
-
-#hud-remaining {
-  font-size: 11px;
-  letter-spacing: 2px;
-  color: var(--accent);
-}
-
-/* Progress bar */
-.progress-bar-wrap {
-  height: 2px;
-  background: var(--border);
-  position: relative;
-}
-
-#progress-bar {
-  height: 100%;
-  background: var(--accent);
-  width: 0%;
-  transition: width 1s linear;
-}
-
-/* Next up panel */
-.next-up-panel {
-  height: 80px;
-  background: var(--panel);
-  border-top: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  padding: 0 24px;
-  gap: 20px;
-  overflow: hidden;
-}
-
-.next-up-label {
-  font-size: 9px;
-  letter-spacing: 4px;
-  color: var(--dim);
-  text-transform: uppercase;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.next-up-divider {
-  width: 1px;
-  height: 30px;
-  background: var(--border);
-  flex-shrink: 0;
-}
-
-.next-up-title {
-  font-size: 14px;
-  letter-spacing: 2px;
-  color: #bbb;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.next-up-meta {
-  font-size: 10px;
-  letter-spacing: 2px;
-  color: var(--dim);
-  margin-top: 3px;
-}
-
-.next-up-empty {
-  font-size: 11px;
-  letter-spacing: 3px;
-  color: var(--dim2);
-}
-
-/* ═══════════════════════════════════
-   BROADCAST PAGE
-═══════════════════════════════════ */
-#page-broadcast {
-  display: none;
-  padding: 52px 0 40px;
-}
-#page-broadcast.active { display: block; }
-
-.bc-wrap {
-  max-width: 860px;
-  margin: 0 auto;
-  padding: 40px 32px;
-}
-
-.bc-head {
-  margin-bottom: 40px;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 24px;
-}
-
-.bc-head h1 {
-  font-size: 28px;
-  font-weight: 300;
-  letter-spacing: 6px;
-  text-transform: uppercase;
-}
-
-.bc-head p {
-  font-size: 11px;
-  letter-spacing: 2px;
-  color: var(--dim);
-  margin-top: 8px;
-}
-
-/* Form */
-.form-section {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  padding: 32px;
-  margin-bottom: 32px;
-}
-
-.form-section-title {
-  font-size: 10px;
-  letter-spacing: 5px;
-  text-transform: uppercase;
-  color: var(--dim);
-  margin-bottom: 24px;
-}
-
-.field {
-  margin-bottom: 20px;
-}
-
-.field label {
-  display: block;
-  font-size: 10px;
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  color: var(--dim);
-  margin-bottom: 8px;
-}
-
-.field input, .field select {
-  width: 100%;
-  background: #000;
-  border: 1px solid var(--border);
-  color: var(--fg);
-  font-family: inherit;
-  font-size: 14px;
-  letter-spacing: 1px;
-  padding: 10px 14px;
-  outline: none;
-  transition: border-color 0.2s;
-}
-
-.field input:focus, .field select:focus {
-  border-color: var(--accent);
-}
-
-.field select option { background: #111; }
-
-/* Drop zone */
-.dropzone {
-  border: 1px dashed var(--dim2);
-  padding: 40px;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
-  position: relative;
-}
-.dropzone:hover, .dropzone.drag-over {
-  border-color: var(--accent);
-  background: rgba(232,255,0,0.02);
-}
-.dropzone input[type=file] {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
-  width: 100%;
-  height: 100%;
-}
-.dropzone-icon {
-  font-size: 32px;
-  color: var(--dim2);
-  margin-bottom: 12px;
-}
-.dropzone-text {
-  font-size: 11px;
-  letter-spacing: 3px;
-  color: var(--dim);
-}
-.dropzone-selected {
-  font-size: 12px;
-  letter-spacing: 2px;
-  color: var(--accent);
-  margin-top: 10px;
-}
-
-/* Upload progress */
-.upload-progress-wrap {
-  display: none;
-  margin-top: 16px;
-}
-.upload-progress-wrap.show { display: block; }
-.upload-progress-bar {
-  height: 2px;
-  background: var(--border);
-  overflow: hidden;
-}
-.upload-progress-fill {
-  height: 100%;
-  background: var(--accent);
-  width: 0%;
-  transition: width 0.3s;
-}
-.upload-status {
-  font-size: 10px;
-  letter-spacing: 2px;
-  color: var(--dim);
-  margin-top: 8px;
-}
+/* ═══ BROADCAST PAGE ═══ */
+.bc-wrap{max-width:860px;margin:0 auto;padding:40px 32px}
+.bc-head{margin-bottom:36px;border-bottom:1px solid var(--border);padding-bottom:20px}
+.bc-head h1{font-size:26px;font-weight:300;letter-spacing:6px;text-transform:uppercase}
+.bc-head p{font-size:11px;letter-spacing:2px;color:var(--dim);margin-top:8px}
+.form-section{background:var(--panel);border:1px solid var(--border);padding:28px;margin-bottom:28px}
+.form-section-title{font-size:10px;letter-spacing:5px;text-transform:uppercase;color:var(--dim);margin-bottom:22px}
+.field{margin-bottom:18px}
+.field label{display:block;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--dim);margin-bottom:7px}
+.field input,.field select{width:100%;background:#000;border:1px solid var(--border);color:var(--fg);
+  font-family:inherit;font-size:14px;letter-spacing:1px;padding:10px 14px;outline:none;transition:border-color .2s}
+.field input:focus,.field select:focus{border-color:var(--accent)}
+.field select option{background:#111}
+.fields-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.dropzone{border:1px dashed var(--dim2);padding:36px;text-align:center;cursor:pointer;
+  transition:border-color .2s,background .2s;position:relative}
+.dropzone:hover,.dropzone.drag-over{border-color:var(--accent);background:rgba(232,255,0,.02)}
+.dropzone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.dz-icon{font-size:28px;color:var(--dim2);margin-bottom:10px}
+.dz-text{font-size:11px;letter-spacing:3px;color:var(--dim)}
+.dz-sel{font-size:12px;letter-spacing:2px;color:var(--accent);margin-top:8px}
+.upload-prog-wrap{display:none;margin-top:14px}
+.upload-prog-wrap.show{display:block}
+.upload-prog-bar{height:2px;background:var(--border)}
+.upload-prog-fill{height:100%;background:var(--accent);width:0%;transition:width .3s}
+.upload-status{font-size:10px;letter-spacing:2px;color:var(--dim);margin-top:7px}
 
 /* Buttons */
-.btn {
-  background: none;
-  border: 1px solid var(--border);
-  color: var(--fg);
-  font-family: inherit;
-  font-size: 11px;
-  letter-spacing: 4px;
-  text-transform: uppercase;
-  padding: 12px 28px;
-  cursor: pointer;
-  transition: border-color 0.2s, color 0.2s, background 0.2s;
-}
-.btn:hover { border-color: var(--fg); }
-.btn-accent {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-.btn-accent:hover {
-  background: var(--accent);
-  color: #000;
-}
-.btn-danger { border-color: var(--red); color: var(--red); }
-.btn-danger:hover { background: var(--red); color: #fff; }
-.btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.btn{background:none;border:1px solid var(--border);color:var(--fg);font-family:inherit;
+  font-size:11px;letter-spacing:4px;text-transform:uppercase;padding:11px 24px;
+  cursor:pointer;transition:border-color .2s,color .2s,background .2s}
+.btn:hover{border-color:var(--fg)}
+.btn-accent{border-color:var(--accent);color:var(--accent)}
+.btn-accent:hover{background:var(--accent);color:#000}
+.btn-red{border-color:var(--red);color:var(--red)}
+.btn-red:hover{background:var(--red);color:#fff}
+.btn:disabled{opacity:.3;cursor:not-allowed}
 
 /* Schedule table */
-.schedule-section {
-  margin-top: 40px;
-}
+.schedule-title{font-size:10px;letter-spacing:5px;text-transform:uppercase;color:var(--dim);
+  margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.schedule-empty{text-align:center;padding:40px;color:var(--dim2);font-size:12px;letter-spacing:3px;border:1px solid var(--border)}
+.sched-item{display:grid;grid-template-columns:70px 1fr 170px 90px 60px;align-items:center;
+  padding:14px 18px;border:1px solid var(--border);border-top:none;gap:14px;transition:background .2s}
+.sched-item:first-child{border-top:1px solid var(--border)}
+.sched-item:hover{background:rgba(255,255,255,.02)}
+.sched-item.live-row{border-left:2px solid var(--red);background:rgba(255,60,0,.03)}
+.sched-item.rtc-row{border-left:2px solid var(--accent);background:rgba(232,255,0,.03)}
+.sched-status{font-size:9px;letter-spacing:3px;text-align:center}
+.sched-status.live{color:var(--red)}
+.sched-status.rtc{color:var(--accent)}
+.sched-status.queued{color:var(--dim)}
+.sched-title-text{font-size:13px;letter-spacing:1px}
+.sched-broadcaster-text{font-size:10px;letter-spacing:2px;color:var(--dim);margin-top:3px}
+.sched-time{font-size:10px;letter-spacing:1px;color:var(--dim);line-height:1.7}
+.sched-dur{font-size:11px;letter-spacing:2px;color:var(--accent);text-align:center}
 
-.schedule-title {
-  font-size: 10px;
-  letter-spacing: 5px;
-  text-transform: uppercase;
-  color: var(--dim);
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
-}
+.result-msg{padding:12px 18px;font-size:11px;letter-spacing:2px;display:none;margin-top:14px}
+.result-msg.show{display:block}
+.result-msg.success{border-left:2px solid var(--accent);color:var(--accent);background:rgba(232,255,0,.04)}
+.result-msg.error{border-left:2px solid var(--red);color:var(--red);background:rgba(255,60,0,.04)}
 
-.schedule-empty {
-  text-align: center;
-  padding: 48px;
-  color: var(--dim2);
-  font-size: 12px;
-  letter-spacing: 3px;
-  border: 1px solid var(--border);
-}
+/* ═══ GO LIVE PAGE ═══ */
+.golive-wrap{max-width:800px;margin:0 auto;padding:40px 32px}
+.golive-head{margin-bottom:36px;border-bottom:1px solid var(--border);padding-bottom:20px}
+.golive-head h1{font-size:26px;font-weight:300;letter-spacing:6px;text-transform:uppercase}
+.golive-head p{font-size:11px;letter-spacing:2px;color:var(--dim);margin-top:8px}
 
-.schedule-item {
-  display: grid;
-  grid-template-columns: 60px 1fr 160px 100px 60px;
-  align-items: center;
-  padding: 16px 20px;
-  border: 1px solid var(--border);
-  border-top: none;
-  gap: 16px;
-  transition: background 0.2s;
-}
-.schedule-item:first-child { border-top: 1px solid var(--border); }
-.schedule-item:hover { background: rgba(255,255,255,0.02); }
+/* Preview */
+.preview-wrap{position:relative;background:#000;aspect-ratio:16/9;margin-bottom:24px;overflow:hidden}
+#preview-video{width:100%;height:100%;object-fit:contain;display:block}
+.preview-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:12px;background:rgba(0,0,0,.8)}
+.preview-overlay.hidden{display:none}
+.preview-icon{font-size:48px;color:var(--dim2)}
+.preview-text{font-size:11px;letter-spacing:3px;color:var(--dim)}
 
-.schedule-item.live-row {
-  border-left: 2px solid var(--red);
-  background: rgba(255,60,0,0.03);
-}
+/* Live panel */
+.golive-panel{background:var(--panel);border:1px solid var(--border);padding:28px;margin-bottom:20px}
+.golive-panel-title{font-size:10px;letter-spacing:5px;text-transform:uppercase;color:var(--dim);margin-bottom:20px}
 
-.sched-status {
-  font-size: 9px;
-  letter-spacing: 3px;
-  text-align: center;
-  padding: 4px 0;
-}
-.sched-status.live { color: var(--red); }
-.sched-status.queued { color: var(--dim); }
+/* On-air indicator */
+.on-air{display:none;align-items:center;gap:10px;padding:14px 20px;
+  border:1px solid var(--accent);background:rgba(232,255,0,.05);margin-bottom:20px}
+.on-air.show{display:flex}
+.on-air-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 12px var(--accent);animation:blink 1s infinite}
+.on-air-text{font-size:11px;letter-spacing:4px;color:var(--accent)}
+#on-air-timer{font-size:13px;letter-spacing:3px;color:var(--accent)}
 
-.sched-info {}
-.sched-title { font-size: 13px; letter-spacing: 1px; }
-.sched-broadcaster { font-size: 10px; letter-spacing: 2px; color: var(--dim); margin-top: 3px; }
+/* Source selector */
+.source-btns{display:flex;gap:8px;margin-bottom:20px}
+.source-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;
+  padding:16px 8px;background:none;border:1px solid var(--border);color:var(--dim);
+  font-family:inherit;font-size:9px;letter-spacing:3px;text-transform:uppercase;
+  cursor:pointer;transition:border-color .2s,color .2s}
+.source-btn:hover{border-color:#555;color:#999}
+.source-btn.active{border-color:var(--accent);color:var(--accent)}
+.source-btn-icon{font-size:22px}
 
-.sched-time {
-  font-size: 10px;
-  letter-spacing: 1px;
-  color: var(--dim);
-  line-height: 1.6;
-}
+/* Controls */
+.live-controls{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
 
-.sched-dur {
-  font-size: 11px;
-  letter-spacing: 2px;
-  color: var(--accent);
-  text-align: center;
-}
+/* Stats bar */
+.stats-bar{display:flex;gap:24px;padding:14px 0;border-top:1px solid var(--border);margin-top:16px}
+.stat{display:flex;flex-direction:column;gap:4px}
+.stat-label{font-size:9px;letter-spacing:3px;color:var(--dim)}
+.stat-value{font-size:16px;letter-spacing:2px;color:var(--fg)}
 
-.sched-del {
-  text-align: center;
-}
-
-/* Result message */
-.result-msg {
-  padding: 14px 20px;
-  font-size: 11px;
-  letter-spacing: 2px;
-  display: none;
-  margin-top: 16px;
-}
-.result-msg.show { display: block; }
-.result-msg.success { border-left: 2px solid var(--accent); color: var(--accent); background: rgba(232,255,0,0.04); }
-.result-msg.error { border-left: 2px solid var(--red); color: var(--red); background: rgba(255,60,0,0.04); }
-
-.fields-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
+/* Connection log */
+.conn-log{background:#000;border:1px solid var(--border);padding:14px;
+  max-height:120px;overflow-y:auto;font-size:10px;letter-spacing:1px;
+  color:var(--dim);font-family:monospace;margin-top:16px;display:none}
+.conn-log.show{display:block}
+.log-entry{padding:1px 0}
+.log-entry.ok{color:#4caf50}
+.log-entry.err{color:var(--red)}
+.log-entry.info{color:var(--dim)}
 </style>
 </head>
 <body>
@@ -580,93 +213,77 @@ nav {
 <!-- NAV -->
 <nav>
   <div class="logo">X<em>ch</em></div>
-  <div class="nav-center">
-    <button class="tab active" onclick="switchTab('viewer')">WATCH</button>
-    <button class="tab" onclick="switchTab('broadcast')">BROADCAST</button>
+  <div class="nav-tabs">
+    <button class="tab active" onclick="gotoTab('viewer',this)">WATCH</button>
+    <button class="tab" onclick="gotoTab('broadcast',this)">SCHEDULE</button>
+    <button class="tab" onclick="gotoTab('golive',this)">GO LIVE</button>
   </div>
   <div class="nav-right">
-    <div class="live-indicator">
-      <div class="dot" id="nav-dot"></div>
-      <span id="nav-live-text">OFFLINE</span>
-    </div>
+    <div class="dot" id="nav-dot"></div>
+    <span id="nav-status">OFFLINE</span>
     <span style="color:var(--dim2)">|</span>
     <span id="nav-clock">00:00:00</span>
   </div>
 </nav>
 
-<!-- ═══ VIEWER PAGE ═══ -->
+<!-- ═══ VIEWER ═══ -->
 <div class="page" id="page-viewer">
-
   <div class="video-container">
-    <video id="main-video" autoplay></video>
+    <video id="main-video" autoplay playsinline></video>
+    <video id="webrtc-video" autoplay playsinline></video>
 
-    <!-- オフライン / 待機オーバーレイ -->
     <div class="video-overlay" id="video-overlay">
       <span class="overlay-label">XCH — 001</span>
       <div class="overlay-title" id="overlay-title">NO BROADCAST</div>
       <div class="overlay-sub" id="overlay-sub">配信を待っています</div>
     </div>
 
-    <!-- HUD: 左上 LIVE + 時計 -->
     <div class="hud hud-tl" id="hud-tl" style="display:none">
-      <div class="dot live" style="pointer-events:none"></div>
-      <span class="hud-live-text">LIVE</span>
-      <span class="hud-clock" id="hud-clock">00:00:00</span>
+      <div class="dot on" style="pointer-events:none"></div>
+      <span class="hud-live-text" id="hud-live-label">LIVE</span>
+      <span class="hud-clock-text" id="hud-clock">00:00:00</span>
     </div>
 
-    <!-- HUD: 右上 タイトル -->
     <div class="hud hud-tr" id="hud-tr" style="display:none">
       <div id="hud-title">—</div>
       <div id="hud-broadcaster">—</div>
     </div>
 
-    <!-- HUD: 左下 残り時間 -->
     <div class="hud hud-bl" id="hud-bl" style="display:none">
-      <span class="hud-remaining-label">REMAINING</span>
+      <span class="hud-rem-label">REMAINING</span>
       <span id="hud-remaining">—</span>
     </div>
-  </div>
 
-  <!-- プログレスバー -->
-  <div class="progress-bar-wrap">
-    <div id="progress-bar"></div>
-  </div>
-
-  <!-- ネクスト -->
-  <div class="next-up-panel">
-    <span class="next-up-label">Next</span>
-    <div class="next-up-divider"></div>
-    <div id="next-up-content">
-      <div class="next-up-empty" style="letter-spacing:3px;font-size:11px;color:var(--dim2)">— キューは空です —</div>
+    <div class="hud hud-br" id="hud-viewers-wrap" style="display:none">
+      <span id="hud-viewers">— viewers</span>
     </div>
   </div>
 
+  <div class="progress-bar-wrap"><div id="progress-bar"></div></div>
+
+  <div class="next-up-panel">
+    <span class="next-label">Next</span>
+    <div class="next-divider"></div>
+    <div id="next-up-content">
+      <div class="next-empty">— キューは空です —</div>
+    </div>
+  </div>
 </div>
 
-<!-- ═══ BROADCAST PAGE ═══ -->
+<!-- ═══ SCHEDULE PAGE ═══ -->
 <div class="page" id="page-broadcast">
 <div class="bc-wrap">
-
   <div class="bc-head">
-    <h1>Broadcast</h1>
-    <p>動画をアップロードして配信をスケジュールする</p>
+    <h1>Schedule</h1>
+    <p>動画をアップロードして配信を予約する</p>
   </div>
 
-  <!-- アップロードフォーム -->
   <div class="form-section">
-    <div class="form-section-title">新規配信予約</div>
-
+    <div class="form-section-title">新規予約</div>
     <div class="fields-row">
-      <div class="field">
-        <label>タイトル</label>
-        <input type="text" id="f-title" placeholder="配信タイトル">
-      </div>
-      <div class="field">
-        <label>配信者名</label>
-        <input type="text" id="f-broadcaster" placeholder="あなたの名前">
-      </div>
+      <div class="field"><label>タイトル</label><input type="text" id="f-title" placeholder="配信タイトル"></div>
+      <div class="field"><label>配信者名</label><input type="text" id="f-broadcaster" placeholder="名前"></div>
     </div>
-
     <div class="field">
       <label>配信時間</label>
       <select id="f-duration">
@@ -683,358 +300,647 @@ nav {
         <option value="24">24時間</option>
       </select>
     </div>
-
     <div class="field">
       <label>動画ファイル</label>
       <div class="dropzone" id="dropzone">
         <input type="file" id="f-file" accept="video/mp4,video/webm,video/quicktime,video/x-matroska">
-        <div class="dropzone-icon">▲</div>
-        <div class="dropzone-text">クリックまたはドラッグ&ドロップ</div>
-        <div class="dropzone-text" style="margin-top:4px;font-size:9px;color:var(--dim2)">MP4 / WEBM / MOV / MKV</div>
-        <div class="dropzone-selected" id="dropzone-selected"></div>
+        <div class="dz-icon">▲</div>
+        <div class="dz-text">クリックまたはドラッグ&ドロップ</div>
+        <div class="dz-text" style="margin-top:4px;font-size:9px;color:var(--dim2)">MP4 / WEBM / MOV / MKV</div>
+        <div class="dz-sel" id="dz-sel"></div>
       </div>
-      <div class="upload-progress-wrap" id="upload-progress-wrap">
-        <div class="upload-progress-bar"><div class="upload-progress-fill" id="upload-progress-fill"></div></div>
+      <div class="upload-prog-wrap" id="upload-prog-wrap">
+        <div class="upload-prog-bar"><div class="upload-prog-fill" id="upload-prog-fill"></div></div>
         <div class="upload-status" id="upload-status">アップロード中...</div>
       </div>
     </div>
-
     <button class="btn btn-accent" id="upload-btn" onclick="doUpload()">予約する</button>
     <div class="result-msg" id="result-msg"></div>
   </div>
 
-  <!-- スケジュール -->
-  <div class="schedule-section">
-    <div class="schedule-title">配信スケジュール</div>
-    <div id="schedule-list">
-      <div class="schedule-empty">スケジュールなし</div>
-    </div>
-    <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
-      <button class="btn btn-danger" onclick="doSkip()" id="skip-btn" style="display:none">現在の配信をスキップ</button>
+  <div class="schedule-title">配信スケジュール</div>
+  <div id="schedule-list"><div class="schedule-empty">スケジュールなし</div></div>
+  <div style="margin-top:14px;display:flex;gap:10px">
+    <button class="btn btn-red" id="skip-btn" style="display:none" onclick="doSkip()">現在の配信をスキップ</button>
+  </div>
+</div>
+</div>
+
+<!-- ═══ GO LIVE PAGE ═══ -->
+<div class="page" id="page-golive">
+<div class="golive-wrap">
+  <div class="golive-head">
+    <h1>Go Live</h1>
+    <p>WebRTCリアルタイム配信 — カメラ / 画面共有</p>
+  </div>
+
+  <!-- On-air indicator -->
+  <div class="on-air" id="on-air">
+    <div class="on-air-dot"></div>
+    <span class="on-air-text">ON AIR</span>
+    <span id="on-air-timer">00:00:00</span>
+  </div>
+
+  <!-- Preview -->
+  <div class="preview-wrap">
+    <video id="preview-video" muted autoplay playsinline></video>
+    <div class="preview-overlay" id="preview-overlay">
+      <div class="preview-icon">◉</div>
+      <div class="preview-text">ソースを選択してプレビュー</div>
     </div>
   </div>
+
+  <!-- Source selector -->
+  <div class="golive-panel">
+    <div class="golive-panel-title">映像ソース</div>
+    <div class="source-btns">
+      <button class="source-btn" id="src-camera" onclick="selectSource('camera')">
+        <span class="source-btn-icon">📷</span>CAMERA
+      </button>
+      <button class="source-btn" id="src-screen" onclick="selectSource('screen')">
+        <span class="source-btn-icon">🖥</span>SCREEN
+      </button>
+      <button class="source-btn" id="src-both" onclick="selectSource('both')">
+        <span class="source-btn-icon">⊕</span>CAMERA + MIC
+      </button>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div class="golive-panel" id="live-settings-panel">
+    <div class="golive-panel-title">配信設定</div>
+    <div class="fields-row">
+      <div class="field"><label>タイトル</label><input type="text" id="live-title" placeholder="ライブ配信タイトル"></div>
+      <div class="field"><label>配信者名</label><input type="text" id="live-broadcaster" placeholder="名前"></div>
+    </div>
+    <div class="field">
+      <label>配信時間</label>
+      <select id="live-duration">
+        <option value="0.083">5分（テスト用）</option>
+        <option value="0.25">15分</option>
+        <option value="0.5">30分</option>
+        <option value="1" selected>1時間</option>
+        <option value="2">2時間</option>
+        <option value="3">3時間</option>
+        <option value="6">6時間</option>
+        <option value="8">8時間</option>
+        <option value="12">12時間</option>
+      </select>
+    </div>
+
+    <div class="live-controls">
+      <button class="btn btn-accent" id="btn-go-live" onclick="goLive()" disabled>配信開始</button>
+      <button class="btn btn-red" id="btn-end-live" onclick="endLive()" style="display:none">配信終了</button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="golive-panel" id="live-stats" style="display:none">
+    <div class="golive-panel-title">配信統計</div>
+    <div class="stats-bar">
+      <div class="stat"><div class="stat-label">VIEWERS</div><div class="stat-value" id="stat-viewers">0</div></div>
+      <div class="stat"><div class="stat-label">ELAPSED</div><div class="stat-value" id="stat-elapsed">00:00</div></div>
+      <div class="stat"><div class="stat-label">REMAINING</div><div class="stat-value" id="stat-remaining">—</div></div>
+      <div class="stat"><div class="stat-label">STATUS</div><div class="stat-value" id="stat-status" style="color:var(--accent)">—</div></div>
+    </div>
+  </div>
+
+  <!-- Connection log -->
+  <div class="conn-log" id="conn-log"></div>
 
 </div>
 </div>
 
 <script>
-// ── Tab switching ─────────────────────────────────────────────────────────────
-function switchTab(tab) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  event.currentTarget.classList.add('active');
-  document.getElementById('page-' + tab).classList.add('active');
-  if (tab === 'broadcast') renderSchedule();
-}
+'use strict';
 
-// ── Clock ─────────────────────────────────────────────────────────────────────
-function tickClock() {
-  const now = new Date();
-  const t = [now.getHours(), now.getMinutes(), now.getSeconds()]
-    .map(n => String(n).padStart(2, '0')).join(':');
-  document.getElementById('nav-clock').textContent = t;
-  document.getElementById('hud-clock').textContent = t;
-}
-setInterval(tickClock, 1000);
-tickClock();
-
-// ── API ───────────────────────────────────────────────────────────────────────
-const API = '';  // same origin
-
-let currentStatus = null;
-let currentVideoId = null;
-
-async function fetchStatus() {
-  try {
-    const r = await fetch(`${API}/api/status`);
-    const data = await r.json();
-    applyStatus(data);
-  } catch(e) {
-    console.error('status fetch failed', e);
-  }
-}
-
-function fmtTime(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'});
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Utilities
+// ─────────────────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
 function fmtDate(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
-  const mm = String(d.getMonth()+1).padStart(2,'0');
-  const dd = String(d.getDate()).padStart(2,'0');
-  return `${mm}/${dd} ${d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}`;
+  return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}`;
+}
+function fmtSec(s) {
+  if (s == null || s < 0) return '—';
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = Math.floor(s%60);
+  if (h > 0) return `${h}h ${String(m).padStart(2,'0')}m`;
+  if (m > 0) return `${m}m ${String(sec).padStart(2,'0')}s`;
+  return `${String(sec).padStart(2,'0')}s`;
+}
+function fmtHMS(sec) {
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = Math.floor(sec%60);
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 
-function fmtRemaining(seconds) {
-  if (seconds == null || seconds < 0) return '—';
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  if (h > 0) return `${h}h ${String(m).padStart(2,'0')}m`;
-  if (m > 0) return `${m}m ${String(s).padStart(2,'0')}s`;
-  return `${String(s).padStart(2,'0')}s`;
+// ─────────────────────────────────────────────────────────────────────────────
+// Clock
+// ─────────────────────────────────────────────────────────────────────────────
+function tickClock() {
+  const now = new Date();
+  const t = [now.getHours(),now.getMinutes(),now.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':');
+  $('nav-clock').textContent = t;
+  $('hud-clock').textContent = t;
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tab routing
+// ─────────────────────────────────────────────────────────────────────────────
+function gotoTab(name, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const page = $('page-' + name);
+  if (page) page.classList.add('active');
+  if (name === 'broadcast') renderSchedule();
+}
+// Start on viewer
+$('page-viewer').classList.add('active');
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Viewer: status polling & video switching
+// ─────────────────────────────────────────────────────────────────────────────
+let currentVideoId = null;
+let isWatchingRTC  = false;
+
+async function fetchStatus() {
+  try {
+    const data = await fetch('/api/status').then(r => r.json());
+    applyStatus(data);
+  } catch(e) {}
 }
 
 function applyStatus(data) {
-  currentStatus = data;
-  const dot = document.getElementById('nav-dot');
-  const navText = document.getElementById('nav-live-text');
+  const dot  = $('nav-dot');
+  const nav  = $('nav-status');
+  const isRTC = data.webrtc_live;
 
   if (data.is_live && data.current) {
     const cur = data.current;
+    dot.className = 'dot ' + (isRTC ? 'rtc' : 'on');
+    nav.textContent = isRTC ? 'LIVE·RTC' : 'LIVE';
 
-    // Nav
-    dot.classList.add('live');
-    navText.textContent = 'LIVE';
+    $('video-overlay').classList.add('hidden');
+    $('hud-tl').style.display = 'flex';
+    $('hud-tr').style.display = 'block';
+    $('hud-bl').style.display = 'flex';
 
-    // Overlay
-    document.getElementById('video-overlay').classList.add('hidden');
+    if (isRTC) {
+      $('hud-tl').classList.add('rtc-mode');
+      $('hud-live-label').textContent = 'LIVE · RTC';
+      $('hud-viewers-wrap').style.display = 'block';
+      $('hud-viewers').textContent = (data.viewer_count || 0) + ' viewers';
+    } else {
+      $('hud-tl').classList.remove('rtc-mode');
+      $('hud-live-label').textContent = 'LIVE';
+      $('hud-viewers-wrap').style.display = 'none';
+    }
 
-    // HUD
-    document.getElementById('hud-tl').style.display = 'flex';
-    document.getElementById('hud-tr').style.display = 'block';
-    document.getElementById('hud-bl').style.display = 'flex';
-    document.getElementById('hud-title').textContent = cur.title;
-    document.getElementById('hud-broadcaster').textContent = cur.broadcaster;
+    $('hud-title').textContent = cur.title;
+    $('hud-broadcaster').textContent = cur.broadcaster;
+    $('hud-remaining').textContent = fmtSec(cur.remaining_seconds);
 
-    // Remaining
-    const rem = cur.remaining_seconds;
-    document.getElementById('hud-remaining').textContent = fmtRemaining(rem);
+    const totalSec = (cur.duration_hours || 1) * 3600;
+    const elapsed  = totalSec - (cur.remaining_seconds || 0);
+    $('progress-bar').style.width = Math.min(100, (elapsed / totalSec) * 100) + '%';
 
-    // Progress
-    const totalSec = cur.duration_hours * 3600;
-    const elapsed = totalSec - rem;
-    const pct = Math.min(100, (elapsed / totalSec) * 100);
-    document.getElementById('progress-bar').style.width = pct + '%';
-
-    // Load video if changed
-    if (cur.id !== currentVideoId) {
-      currentVideoId = cur.id;
-      const video = document.getElementById('main-video');
-      video.src = `/api/stream/${cur.id}`;
-      video.play().catch(() => {});
+    // Video source switching
+    if (isRTC) {
+      // WebRTC — handled by viewer WS connection (see below)
+      if (!isWatchingRTC) {
+        $('main-video').style.display = 'none';
+        connectViewerRTC();
+      }
+    } else {
+      // File stream
+      if (isWatchingRTC) { disconnectViewerRTC(); }
+      $('webrtc-video').classList.remove('active');
+      $('main-video').style.display = 'block';
+      if (cur.id !== currentVideoId) {
+        currentVideoId = cur.id;
+        $('main-video').src = `/api/stream/${cur.id}`;
+        $('main-video').play().catch(()=>{});
+      }
     }
 
     // Next up
-    const nextItems = data.queue.filter(i => i.id !== cur.id && i.status === 'queued');
-    const nextEl = document.getElementById('next-up-content');
-    if (nextItems.length > 0) {
-      const n = nextItems[0];
-      nextEl.innerHTML = `
-        <div class="next-up-title">${escHtml(n.title)}</div>
-        <div class="next-up-meta">${escHtml(n.broadcaster)} — ${fmtDate(n.scheduled_start)} (${n.duration_hours}h)</div>
-      `;
+    const next = (data.queue || []).filter(i => i.id !== cur.id && i.status === 'queued');
+    if (next.length > 0) {
+      const n = next[0];
+      $('next-up-content').innerHTML = `
+        <div class="next-title">${esc(n.title)}</div>
+        <div class="next-meta">${esc(n.broadcaster)} — ${fmtDate(n.scheduled_start)} (${n.duration_hours}h)</div>`;
     } else {
-      nextEl.innerHTML = `<div class="next-up-empty">次の配信はありません</div>`;
+      $('next-up-content').innerHTML = `<div class="next-empty">次の配信はありません</div>`;
     }
-
   } else {
-    // Offline
-    dot.classList.remove('live');
-    navText.textContent = 'OFFLINE';
-    document.getElementById('video-overlay').classList.remove('hidden');
-
-    // Check if something is queued
+    dot.className = 'dot';
+    nav.textContent = 'OFFLINE';
+    $('video-overlay').classList.remove('hidden');
+    if (isWatchingRTC) disconnectViewerRTC();
+    $('webrtc-video').classList.remove('active');
+    $('main-video').style.display = 'block';
+    $('main-video').src = '';
+    currentVideoId = null;
+    $('hud-tl').style.display = 'none';
+    $('hud-tr').style.display = 'none';
+    $('hud-bl').style.display = 'none';
+    $('hud-viewers-wrap').style.display = 'none';
+    $('progress-bar').style.width = '0%';
     const q = (data.queue || []).filter(i => i.status === 'queued');
     if (q.length > 0) {
-      const n = q[0];
-      document.getElementById('overlay-title').textContent = n.title;
-      document.getElementById('overlay-sub').textContent =
-        `${escHtml(n.broadcaster)} — 配信開始: ${fmtDate(n.scheduled_start)}`;
+      $('overlay-title').textContent = q[0].title;
+      $('overlay-sub').textContent = `${esc(q[0].broadcaster)} — ${fmtDate(q[0].scheduled_start)}`;
     } else {
-      document.getElementById('overlay-title').textContent = 'NO BROADCAST';
-      document.getElementById('overlay-sub').textContent = '配信を待っています';
+      $('overlay-title').textContent = 'NO BROADCAST';
+      $('overlay-sub').textContent = '配信を待っています';
     }
-
-    document.getElementById('hud-tl').style.display = 'none';
-    document.getElementById('hud-tr').style.display = 'none';
-    document.getElementById('hud-bl').style.display = 'none';
-    document.getElementById('progress-bar').style.width = '0%';
-    currentVideoId = null;
-    const video = document.getElementById('main-video');
-    video.src = '';
-    document.getElementById('next-up-content').innerHTML =
-      `<div class="next-up-empty">— キューは空です —</div>`;
+    $('next-up-content').innerHTML = `<div class="next-empty">— キューは空です —</div>`;
   }
 }
 
-// ── Schedule render ───────────────────────────────────────────────────────────
+fetchStatus();
+setInterval(fetchStatus, 3000);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Schedule page
+// ─────────────────────────────────────────────────────────────────────────────
 async function renderSchedule() {
   try {
-    const r = await fetch(`${API}/api/status`);
-    const data = await r.json();
-    const list = document.getElementById('schedule-list');
+    const data = await fetch('/api/status').then(r => r.json());
     const queue = data.queue || [];
-
-    const skipBtn = document.getElementById('skip-btn');
-    skipBtn.style.display = data.is_live ? 'block' : 'none';
-
+    $('skip-btn').style.display = data.is_live ? 'block' : 'none';
     if (queue.length === 0) {
-      list.innerHTML = '<div class="schedule-empty">スケジュールなし</div>';
+      $('schedule-list').innerHTML = '<div class="schedule-empty">スケジュールなし</div>';
       return;
     }
-
-    list.innerHTML = queue.map(item => {
+    $('schedule-list').innerHTML = queue.map(item => {
       const isLive = item.status === 'live';
-      return `
-        <div class="schedule-item ${isLive ? 'live-row' : ''}">
-          <div class="sched-status ${item.status}">${isLive ? '● LIVE' : 'QUEUED'}</div>
-          <div class="sched-info">
-            <div class="sched-title">${escHtml(item.title)}</div>
-            <div class="sched-broadcaster">${escHtml(item.broadcaster)}</div>
-          </div>
-          <div class="sched-time">
-            ${fmtDate(item.scheduled_start)}<br>
-            → ${fmtDate(item.scheduled_end)}
-          </div>
-          <div class="sched-dur">${item.duration_hours}h</div>
-          <div class="sched-del">
-            ${!isLive ? `<button class="btn btn-danger" style="padding:6px 10px;font-size:9px" onclick="doDelete('${item.id}')">✕</button>` : ''}
-          </div>
-        </div>
-      `;
+      const isRTC  = item.type === 'webrtc';
+      const rowCls = isRTC ? 'rtc-row' : (isLive ? 'live-row' : '');
+      const stCls  = isRTC ? 'rtc' : (isLive ? 'live' : 'queued');
+      const stText = isRTC ? '● RTC' : (isLive ? '● LIVE' : 'QUEUED');
+      return `<div class="sched-item ${rowCls}">
+        <div class="sched-status ${stCls}">${stText}</div>
+        <div><div class="sched-title-text">${esc(item.title)}</div><div class="sched-broadcaster-text">${esc(item.broadcaster)}</div></div>
+        <div class="sched-time">${fmtDate(item.scheduled_start)}<br>→ ${fmtDate(item.scheduled_end)}</div>
+        <div class="sched-dur">${item.duration_hours}h</div>
+        <div style="text-align:center">${!isLive ? `<button class="btn btn-red" style="padding:5px 10px;font-size:9px" onclick="doDelete('${item.id}')">✕</button>` : ''}</div>
+      </div>`;
     }).join('');
-  } catch(e) {
-    console.error(e);
-  }
+  } catch(e) {}
 }
 
-// ── Upload ────────────────────────────────────────────────────────────────────
-document.getElementById('f-file').addEventListener('change', function() {
-  const f = this.files[0];
-  document.getElementById('dropzone-selected').textContent = f ? f.name : '';
-});
-
-const dz = document.getElementById('dropzone');
+// Dropzone
+const dz = $('dropzone');
+$('f-file').addEventListener('change', function(){ $('dz-sel').textContent = this.files[0]?.name || ''; });
 dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
 dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
 dz.addEventListener('drop', e => {
-  e.preventDefault();
-  dz.classList.remove('drag-over');
+  e.preventDefault(); dz.classList.remove('drag-over');
   const f = e.dataTransfer.files[0];
-  if (f) {
-    document.getElementById('f-file').files = e.dataTransfer.files;
-    document.getElementById('dropzone-selected').textContent = f.name;
-  }
+  if (f) { $('f-file').files = e.dataTransfer.files; $('dz-sel').textContent = f.name; }
 });
 
 async function doUpload() {
-  const title = document.getElementById('f-title').value.trim();
-  const broadcaster = document.getElementById('f-broadcaster').value.trim();
-  const duration = document.getElementById('f-duration').value;
-  const file = document.getElementById('f-file').files[0];
-
-  if (!title || !broadcaster || !file) {
-    showResult('タイトル・配信者名・動画ファイルを入力してください', 'error');
-    return;
-  }
-
-  const btn = document.getElementById('upload-btn');
-  btn.disabled = true;
-
-  const pw = document.getElementById('upload-progress-wrap');
-  const pf = document.getElementById('upload-progress-fill');
-  const ps = document.getElementById('upload-status');
-  pw.classList.add('show');
-  pf.style.width = '0%';
-  ps.textContent = 'アップロード中...';
-
+  const title = $('f-title').value.trim(), broadcaster = $('f-broadcaster').value.trim();
+  const duration = $('f-duration').value, file = $('f-file').files[0];
+  if (!title || !broadcaster || !file) { showResult('タイトル・配信者名・ファイルを入力してください','error'); return; }
+  const btn = $('upload-btn'); btn.disabled = true;
+  const pw = $('upload-prog-wrap'), pf = $('upload-prog-fill'), ps = $('upload-status');
+  pw.classList.add('show'); pf.style.width = '0%'; ps.textContent = 'アップロード中...';
   const fd = new FormData();
-  fd.append('file', file);
-  fd.append('title', title);
-  fd.append('broadcaster', broadcaster);
-  fd.append('duration_hours', duration);
-
+  fd.append('file', file); fd.append('title', title); fd.append('broadcaster', broadcaster); fd.append('duration_hours', duration);
   try {
-    // XHR for progress
-    await new Promise((resolve, reject) => {
+    await new Promise((res, rej) => {
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', `${API}/api/upload`);
+      xhr.open('POST', '/api/upload');
       xhr.upload.addEventListener('progress', e => {
-        if (e.lengthComputable) {
-          const pct = Math.round((e.loaded / e.total) * 100);
-          pf.style.width = pct + '%';
-          ps.textContent = `アップロード中... ${pct}%`;
-        }
+        if (e.lengthComputable) { const p = Math.round(e.loaded/e.total*100); pf.style.width=p+'%'; ps.textContent=`${p}%`; }
       });
       xhr.addEventListener('load', () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          const data = JSON.parse(xhr.responseText);
-          ps.textContent = '完了';
-          pf.style.width = '100%';
-          showResult(`予約完了！ 配信開始: ${fmtDate(data.scheduled_start)} → ${fmtDate(data.scheduled_end)}`, 'success');
-          // Reset form
-          document.getElementById('f-title').value = '';
-          document.getElementById('f-broadcaster').value = '';
-          document.getElementById('f-file').value = '';
-          document.getElementById('dropzone-selected').textContent = '';
-          resolve();
-        } else {
-          const err = JSON.parse(xhr.responseText);
-          reject(new Error(err.detail || 'アップロード失敗'));
-        }
+        if (xhr.status < 300) {
+          const d = JSON.parse(xhr.responseText); pf.style.width='100%'; ps.textContent='完了';
+          showResult(`予約完了！ ${fmtDate(d.scheduled_start)} → ${fmtDate(d.scheduled_end)}`, 'success');
+          $('f-title').value=''; $('f-broadcaster').value=''; $('f-file').value=''; $('dz-sel').textContent='';
+          res();
+        } else rej(new Error(JSON.parse(xhr.responseText).detail || '失敗'));
       });
-      xhr.addEventListener('error', () => reject(new Error('ネットワークエラー')));
+      xhr.addEventListener('error', () => rej(new Error('Network error')));
       xhr.send(fd);
     });
-  } catch(e) {
-    ps.textContent = 'エラー';
-    showResult(e.message, 'error');
-  } finally {
-    btn.disabled = false;
-    setTimeout(() => { pw.classList.remove('show'); }, 3000);
-    renderSchedule();
-  }
+  } catch(e) { ps.textContent='エラー'; showResult(e.message,'error'); }
+  finally { btn.disabled=false; setTimeout(()=>pw.classList.remove('show'),3000); renderSchedule(); }
 }
 
 function showResult(msg, type) {
-  const el = document.getElementById('result-msg');
-  el.textContent = msg;
-  el.className = `result-msg show ${type}`;
-  setTimeout(() => el.classList.remove('show'), 8000);
+  const el = $('result-msg'); el.textContent=msg; el.className=`result-msg show ${type}`;
+  setTimeout(()=>el.classList.remove('show'),8000);
 }
-
-// ── Delete ────────────────────────────────────────────────────────────────────
 async function doDelete(id) {
-  if (!confirm('この配信予約を削除しますか？')) return;
-  try {
-    const r = await fetch(`${API}/api/queue/${id}`, { method: 'DELETE' });
-    if (!r.ok) throw new Error((await r.json()).detail);
-    renderSchedule();
-  } catch(e) {
-    alert(e.message);
-  }
+  if (!confirm('削除しますか？')) return;
+  const r = await fetch(`/api/queue/${id}`,{method:'DELETE'});
+  if (!r.ok) { alert((await r.json()).detail); return; }
+  renderSchedule();
 }
-
-// ── Skip ─────────────────────────────────────────────────────────────────────
 async function doSkip() {
-  if (!confirm('現在の配信をスキップして次へ移行しますか？')) return;
+  if (!confirm('スキップしますか？')) return;
+  await fetch('/api/skip',{method:'POST'});
+  setTimeout(()=>{fetchStatus();renderSchedule();},500);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GO LIVE  — WebRTC Broadcaster
+// ─────────────────────────────────────────────────────────────────────────────
+let localStream    = null;
+let broadcasterWS  = null;
+let broadcasterPC  = null;   // RTCPeerConnection (SFUモード)
+let liveStartTime  = null;
+let liveTimerID    = null;
+let liveIsActive   = false;
+let pendingViewers = [];      // P2Pモード: 接続待ちのviewer_id
+let viewerPCs      = {};      // P2Pモード: viewer_id -> RTCPeerConnection
+let aiortcMode     = false;   // サーバーサイドSFUが使えるか
+
+function log(msg, type='info') {
+  const el = $('conn-log');
+  el.classList.add('show');
+  const d = document.createElement('div');
+  d.className = 'log-entry ' + type;
+  d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+}
+
+async function selectSource(mode) {
+  document.querySelectorAll('.source-btn').forEach(b => b.classList.remove('active'));
+  $('src-' + (mode === 'both' ? 'both' : mode)).classList.add('active');
   try {
-    await fetch(`${API}/api/skip`, { method: 'POST' });
-    setTimeout(() => { fetchStatus(); renderSchedule(); }, 500);
+    if (localStream) { localStream.getTracks().forEach(t => t.stop()); }
+    if (mode === 'camera' || mode === 'both') {
+      localStream = await navigator.mediaDevices.getUserMedia({
+        video: { width:{ideal:1280}, height:{ideal:720}, frameRate:{ideal:30} },
+        audio: mode === 'both',
+      });
+    } else if (mode === 'screen') {
+      localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+    }
+    $('preview-video').srcObject = localStream;
+    $('preview-overlay').classList.add('hidden');
+    $('btn-go-live').disabled = false;
+    log(`ソース取得: ${mode}`, 'ok');
   } catch(e) {
-    alert('スキップ失敗: ' + e.message);
+    log(`ソース取得失敗: ${e.message}`, 'err');
+    alert('カメラ/画面の取得に失敗しました: ' + e.message);
   }
 }
 
-// ── Poll ──────────────────────────────────────────────────────────────────────
-function escHtml(str) {
-  return String(str)
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;');
+async function goLive() {
+  if (!localStream) { alert('ソースを選択してください'); return; }
+  const title       = $('live-title').value.trim() || 'Live配信';
+  const broadcaster = $('live-broadcaster').value.trim() || '配信者';
+  const durH        = parseFloat($('live-duration').value);
+
+  $('btn-go-live').disabled = true;
+  $('btn-end-live').style.display = 'inline-block';
+  $('on-air').classList.add('show');
+  $('live-stats').style.display = 'block';
+  liveIsActive = true;
+
+  liveStartTime = Date.now();
+  liveTimerID = setInterval(() => {
+    if (!liveIsActive) return;
+    const elapsed = Math.floor((Date.now() - liveStartTime) / 1000);
+    const remaining = durH * 3600 - elapsed;
+    $('on-air-timer').textContent = fmtHMS(elapsed);
+    $('stat-elapsed').textContent = fmtHMS(elapsed);
+    $('stat-remaining').textContent = remaining > 0 ? fmtHMS(remaining) : '終了';
+    if (remaining <= 0) endLive();
+  }, 1000);
+
+  // WebSocket接続
+  const wsUrl = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/broadcast`;
+  broadcasterWS = new WebSocket(wsUrl);
+
+  broadcasterWS.onopen = async () => {
+    log('サーバー接続成功', 'ok');
+    // まず "start" でセッションを登録
+    broadcasterWS.send(JSON.stringify({ type: 'start', title, broadcaster, duration_hours: durH }));
+  };
+
+  broadcasterWS.onmessage = async (ev) => {
+    const msg = JSON.parse(ev.data);
+
+    if (msg.type === 'started') {
+      aiortcMode = msg.aiortc;
+      $('stat-status').textContent = aiortcMode ? 'SFU' : 'P2P';
+      log(`配信開始 (${aiortcMode ? 'aiortc SFUモード' : 'P2Pリレーモード'})`, 'ok');
+
+      if (aiortcMode) {
+        // サーバーSFU: サーバーへofferを送る
+        await _setupBroadcasterPC_SFU();
+      }
+    }
+
+    else if (msg.type === 'answer' && aiortcMode) {
+      // SFUモード: サーバーからanswerが来た
+      await broadcasterPC.setRemoteDescription({ type: msg.sdpType, sdp: msg.sdp });
+      log('SFU接続確立', 'ok');
+    }
+
+    else if (msg.type === 'new_viewer' && !aiortcMode) {
+      // P2Pモード: 新規視聴者
+      const vid = msg.viewer_id;
+      log(`新視聴者: ${vid.slice(0,8)}`, 'info');
+      await _setupP2PViewerConnection(vid);
+    }
+
+    else if (msg.type === 'viewer_offer' && !aiortcMode) {
+      // P2Pモード: 視聴者からのoffer
+      const vid = msg.viewer_id;
+      const vpc = viewerPCs[vid];
+      if (!vpc) return;
+      await vpc.setRemoteDescription({ type: msg.sdpType, sdp: msg.sdp });
+      const answer = await vpc.createAnswer();
+      await vpc.setLocalDescription(answer);
+      broadcasterWS.send(JSON.stringify({ type: 'answer_viewer', viewer_id: vid,
+        sdp: vpc.localDescription.sdp, sdpType: vpc.localDescription.type }));
+    }
+
+    else if (msg.type === 'viewer_ice' && !aiortcMode) {
+      const vid = msg.viewer_id;
+      const vpc = viewerPCs[vid];
+      if (vpc && msg.candidate) {
+        try { await vpc.addIceCandidate(msg.candidate); } catch(e){}
+      }
+    }
+
+    else if (msg.type === 'error') {
+      log('エラー: ' + msg.message, 'err');
+      alert(msg.message);
+      endLive();
+    }
+  };
+
+  broadcasterWS.onerror = () => { log('WebSocket エラー', 'err'); };
+  broadcasterWS.onclose = () => { log('サーバー切断', 'info'); if(liveIsActive) endLive(); };
 }
 
-// Initial tab setup
-document.getElementById('page-viewer').classList.add('active');
+async function _setupBroadcasterPC_SFU() {
+  broadcasterPC = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+  localStream.getTracks().forEach(t => broadcasterPC.addTrack(t, localStream));
 
-// Poll status every 3 seconds
-fetchStatus();
-setInterval(fetchStatus, 3000);
+  broadcasterPC.onicecandidate = e => {
+    if (e.candidate && broadcasterWS?.readyState === WebSocket.OPEN) {
+      broadcasterWS.send(JSON.stringify({ type: 'ice', candidate: e.candidate }));
+    }
+  };
+
+  broadcasterPC.onconnectionstatechange = () => {
+    log(`PC state: ${broadcasterPC.connectionState}`,
+        broadcasterPC.connectionState === 'connected' ? 'ok' : 'info');
+  };
+
+  const offer = await broadcasterPC.createOffer();
+  await broadcasterPC.setLocalDescription(offer);
+  broadcasterWS.send(JSON.stringify({ type: 'offer', sdp: offer.sdp, sdpType: offer.type }));
+}
+
+async function _setupP2PViewerConnection(vid) {
+  const vpc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+  viewerPCs[vid] = vpc;
+  localStream.getTracks().forEach(t => vpc.addTrack(t, localStream));
+
+  vpc.onicecandidate = e => {
+    if (e.candidate && broadcasterWS?.readyState === WebSocket.OPEN) {
+      broadcasterWS.send(JSON.stringify({ type: 'ice_relay', viewer_id: vid, candidate: e.candidate }));
+    }
+  };
+  vpc.onconnectionstatechange = () => {
+    $('stat-viewers').textContent = Object.values(viewerPCs).filter(p => p.connectionState === 'connected').length;
+    log(`Viewer ${vid.slice(0,8)}: ${vpc.connectionState}`, vpc.connectionState==='connected'?'ok':'info');
+  };
+  // Offerを作って配信者側から先に送れるようにする (negotiation needed)
+  vpc.onnegotiationneeded = async () => {
+    const offer = await vpc.createOffer();
+    await vpc.setLocalDescription(offer);
+    // 視聴者にofferを送る必要があるが、P2Pリレーでは視聴者からofferを送る設計のためスキップ
+  };
+}
+
+async function endLive() {
+  if (!liveIsActive) return;
+  liveIsActive = false;
+  clearInterval(liveTimerID);
+  $('on-air').classList.remove('show');
+  $('btn-go-live').disabled = false;
+  $('btn-end-live').style.display = 'none';
+
+  if (broadcasterWS?.readyState === WebSocket.OPEN) {
+    broadcasterWS.send(JSON.stringify({ type: 'end' }));
+    broadcasterWS.close();
+  }
+  broadcasterWS = null;
+
+  if (broadcasterPC) { broadcasterPC.close(); broadcasterPC = null; }
+  Object.values(viewerPCs).forEach(p => p.close());
+  viewerPCs = {};
+
+  log('配信終了', 'info');
+  fetchStatus();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Viewer: WebRTC受信
+// ─────────────────────────────────────────────────────────────────────────────
+let viewerWS  = null;
+let viewerPC  = null;
+const viewerId = crypto.randomUUID();
+
+function connectViewerRTC() {
+  if (viewerWS) return;
+  isWatchingRTC = true;
+  const wsUrl = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/view/${viewerId}`;
+  viewerWS = new WebSocket(wsUrl);
+
+  viewerWS.onopen = () => console.log('[Viewer WS] connected');
+
+  viewerWS.onmessage = async (ev) => {
+    const msg = JSON.parse(ev.data);
+
+    if (msg.type === 'stream_start') {
+      // セッション開始 → WebRTCネゴシエーション
+      if (msg.aiortc) {
+        await _startViewerPeerConnection();
+      }
+      // P2Pモードは配信者からofferが来るのを待つ
+    }
+
+    else if (msg.type === 'answer' && viewerPC) {
+      // SFUからのanswer
+      await viewerPC.setRemoteDescription({ type: msg.sdpType, sdp: msg.sdp });
+    }
+
+    else if (msg.type === 'broadcaster_answer' && viewerPC) {
+      // P2Pモード: 配信者からのanswer
+      await viewerPC.setRemoteDescription({ type: msg.sdpType, sdp: msg.sdp });
+    }
+
+    else if (msg.type === 'broadcaster_ice' && viewerPC) {
+      try { await viewerPC.addIceCandidate(msg.candidate); } catch(e){}
+    }
+
+    else if (msg.type === 'stream_end') {
+      disconnectViewerRTC();
+      fetchStatus();
+    }
+  };
+
+  viewerWS.onclose = () => {
+    viewerWS = null;
+    if (isWatchingRTC) setTimeout(connectViewerRTC, 3000); // 再接続
+  };
+  viewerWS.onerror = () => viewerWS?.close();
+}
+
+async function _startViewerPeerConnection() {
+  if (viewerPC) { viewerPC.close(); viewerPC = null; }
+  viewerPC = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+
+  viewerPC.ontrack = e => {
+    const vid = $('webrtc-video');
+    if (!vid.srcObject) vid.srcObject = new MediaStream();
+    vid.srcObject.addTrack(e.track);
+    vid.classList.add('active');
+    $('main-video').style.display = 'none';
+  };
+
+  viewerPC.onicecandidate = e => {
+    if (e.candidate && viewerWS?.readyState === WebSocket.OPEN) {
+      viewerWS.send(JSON.stringify({ type: 'ice', candidate: e.candidate }));
+    }
+  };
+
+  const offer = await viewerPC.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+  await viewerPC.setLocalDescription(offer);
+  viewerWS.send(JSON.stringify({ type: 'offer', sdp: offer.sdp, sdpType: offer.type }));
+}
+
+function disconnectViewerRTC() {
+  isWatchingRTC = false;
+  if (viewerPC) { viewerPC.close(); viewerPC = null; }
+  if (viewerWS) { viewerWS.onclose = null; viewerWS.close(); viewerWS = null; }
+  const vid = $('webrtc-video');
+  vid.classList.remove('active');
+  vid.srcObject = null;
+  $('main-video').style.display = 'block';
+}
 </script>
 </body>
 </html>
